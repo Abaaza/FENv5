@@ -1,0 +1,29 @@
+{
+  "extends": "../backend/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@backend/*": ["../backend/src/*"],
+      "@convex/*": ["../convex/*"]
+    },
+    "types": ["node", "@vercel/node"],
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "**/*.ts",
+    "../backend/src/**/*.ts",
+    "../convex/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

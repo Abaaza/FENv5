@@ -1,0 +1,142 @@
+name: Deploy to AWS Lambda
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-lambda.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          npm ci --production
+          npm install -g typescript
+          npm install -g @types/node
+
+      - name: Build TypeScript
+        working-directory: backend
+        run: |
+          npm run build
+
+      - name: Prepare deployment package
+        working-directory: backend
+        run: |
+          # Create deployment directory
+          mkdir -p lambda-deploy
+          
+          # Copy built files
+          cp -r dist/* lambda-deploy/
+          cp handler-lambda.js lambda-deploy/
+          cp package.json lambda-deploy/
+          cp package-lock.json lambda-deploy/
+          
+          # Install production dependencies
+          cd lambda-deploy
+          npm ci --production --omit=dev
+          
+          # Remove unnecessary files to reduce size
+          find node_modules -name "*.md" -type f -delete
+          find node_modules -name "*.txt" -type f -delete
+          find node_modules -name "*.map" -type f -delete
+          find node_modules -name "*.ts" -type f -delete
+          find node_modules -name "test" -type d -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "docs" -type d -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name ".github" -type d -exec rm -rf {} + 2>/dev/null || true
+          
+          # Create zip file
+          zip -r ../lambda-function.zip . -q
+          cd ..
+          
+          # Show package size
+          ls -lh lambda-function.zip
+
+      - name: Deploy to Lambda
+        working-directory: backend
+        run: |
+          # Update Lambda code
+          aws lambda update-function-code \
+            --function-name boq-matching-system-prod-api \
+            --zip-file fileb://lambda-function.zip \
+            --no-cli-pager
+          
+          # Wait for update to complete
+          aws lambda wait function-updated \
+            --function-name boq-matching-system-prod-api
+          
+          # Update configuration
+          aws lambda update-function-configuration \
+            --function-name boq-matching-system-prod-api \
+            --handler handler-lambda.handler \
+            --timeout 900 \
+            --memory-size 3008 \
+            --environment Variables="{
+              NODE_ENV=production,
+              JWT_SECRET='${{ secrets.JWT_SECRET }}',
+              JWT_REFRESH_SECRET='${{ secrets.JWT_REFRESH_SECRET }}',
+              CONVEX_URL='${{ secrets.CONVEX_URL }}',
+              NEXT_PUBLIC_CONVEX_URL='${{ secrets.CONVEX_URL }}',
+              AWS_S3_BUCKET=mjd-boq-uploads-prod,
+              S3_BUCKET_NAME=mjd-boq-uploads-prod,
+              PORT=5000,
+              ALLOWED_ORIGINS='*',
+              MAX_FILE_SIZE=52428800,
+              ALLOWED_FILE_TYPES='.xlsx,.xls',
+              RATE_LIMIT_WINDOW_MS=900000,
+              RATE_LIMIT_MAX_REQUESTS=100,
+              FRONTEND_URL='${{ secrets.FRONTEND_URL }}',
+              COOKIE_SECURE=true,
+              COOKIE_HTTPONLY=true,
+              COOKIE_SAMESITE=none
+            }" \
+            --no-cli-pager
+
+      - name: Test deployment
+        run: |
+          sleep 30  # Wait for Lambda to be ready
+          
+          # Test health endpoint
+          echo "Testing Lambda deployment..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://ls4380art0.execute-api.us-east-1.amazonaws.com/health)
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Deployment successful! Health check returned 200"
+            curl -s https://ls4380art0.execute-api.us-east-1.amazonaws.com/health | jq .
+          else
+            echo "❌ Deployment may have issues. Health check returned $response"
+            exit 1
+          fi
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "🚀 Lambda deployed successfully!"
+          else
+            echo "❌ Lambda deployment failed!"
+          fi

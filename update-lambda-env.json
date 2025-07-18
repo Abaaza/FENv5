@@ -1,0 +1,22 @@
+{
+  "Variables": {
+    "JWT_ACCESS_SECRET": "8aApS-a1qfwfZOFai7QwrRq10XwhbCgbsxECg_PWV97agiiLwb_GkB_-ZCsMeKe3",
+    "JWT_REFRESH_SECRET": "cSmmxIRoS2JIGaY6v_vF2bl309IdlqNdOW15PasVAURjuI7QkqGzqSwM_HNxDk-R",
+    "MAX_FILE_SIZE": "52428800",
+    "PORT": "5000",
+    "COOKIE_SAMESITE": "none",
+    "COOKIE_HTTPONLY": "true",
+    "S3_BUCKET_NAME": "mjd-boq-uploads-prod",
+    "ALLOWED_FILE_TYPES": ".xlsx,.xls",
+    "FRONTEND_URL": "https://main.d3j084kic0l1ff.amplifyapp.com",
+    "ALLOWED_ORIGINS": "*",
+    "RATE_LIMIT_MAX_REQUESTS": "100",
+    "AWS_S3_BUCKET": "mjd-boq-uploads-prod",
+    "COOKIE_SECURE": "true",
+    "JWT_SECRET": "8aApS-a1qfwfZOFai7QwrRq10XwhbCgbsxECg_PWV97agiiLwb_GkB_-ZCsMeKe3",
+    "NEXT_PUBLIC_CONVEX_URL": "https://good-dolphin-454.convex.cloud",
+    "CONVEX_URL": "https://good-dolphin-454.convex.cloud",
+    "NODE_ENV": "production",
+    "RATE_LIMIT_WINDOW_MS": "900000"
+  }
+}

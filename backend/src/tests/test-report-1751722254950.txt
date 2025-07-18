@@ -1,0 +1,126 @@
+
+============================================================
+                    TEST REPORT
+============================================================
+
+📅 Timestamp: 2025-07-05T13:30:54.463Z
+⏱️  Duration: 0.49s
+
+📊 SUMMARY
+------------------------------
+Total Tests:  20
+✅ Passed:     8
+❌ Failed:     15
+⚠️  Skipped:    3
+Success Rate: 40.00%
+
+📋 DETAILED RESULTS
+------------------------------------------------------------
+✅ Health Check
+   Endpoint: GET /health
+   Duration: 83ms
+
+✅ Detailed Health Check
+   Endpoint: GET /health/detailed
+   Duration: 162ms
+
+❌ User Registration
+   Endpoint: POST /auth/register
+   Duration: 12ms
+   Error: Status 400: undefined
+
+✅ User Login
+   Endpoint: POST /auth/login
+   Duration: 164ms
+
+❌ Get Current User
+   Endpoint: GET /auth/me
+   Duration: 3ms
+   Error: Status 401
+
+✅ Refresh Token
+   Endpoint: POST /auth/refresh
+   Duration: 5ms
+
+❌ Create Client
+   Endpoint: POST /clients
+   Duration: 4ms
+   Error: Status 401
+
+❌ Get All Clients
+   Endpoint: GET /clients
+   Duration: 2ms
+   Error: Status 401
+
+❌ Create Project
+   Endpoint: POST /projects
+   Duration: 4ms
+   Error: Status 401
+
+❌ Get All Projects
+   Endpoint: GET /projects
+   Duration: 3ms
+   Error: Status 401
+
+❌ Get Price List Stats
+   Endpoint: GET /price-list/stats
+   Duration: 4ms
+   Error: Status 401
+
+❌ Create Price Item
+   Endpoint: POST /price-list
+   Duration: 3ms
+   Error: Status 401
+
+❌ Get All Price Items
+   Endpoint: GET /price-list
+   Duration: 2ms
+   Error: Status 401
+
+❌ Search Price Items
+   Endpoint: POST /price-list/search
+   Duration: 4ms
+   Error: Status 401
+
+✅ Update Price Item
+   Endpoint: PUT /price-list/
+   Duration: 0ms
+
+✅ Upload BOQ File
+   Endpoint: POST /price-matching/upload-and-match
+   Duration: 14ms
+
+❌ Get User Jobs
+   Endpoint: GET /price-matching/jobs
+   Duration: 2ms
+   Error: Status 401
+
+✅ Get Job Status
+   Endpoint: GET /jobs//status
+   Duration: 0ms
+
+❌ Run Local Match Test
+   Endpoint: POST /test/match
+   Duration: 4ms
+   Error: Status 404
+
+❌ Get Dashboard Stats
+   Endpoint: GET /dashboard/stats
+   Duration: 3ms
+   Error: Status 401
+
+❌ Get Recent Activity
+   Endpoint: GET /dashboard/activity
+   Duration: 2ms
+   Error: Status 401
+
+✅ Delete Price Item
+   Endpoint: DELETE /price-list/
+   Duration: 1ms
+
+❌ User Logout
+   Endpoint: POST /auth/logout
+   Duration: 3ms
+   Error: Status 401
+
+============================================================

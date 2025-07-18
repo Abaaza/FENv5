@@ -1,0 +1,1462 @@
+import FuzzySet from 'fuzzyset.js';
+import * as fuzzball from 'fuzzball';
+import Fuse from 'fuse.js';
+import { CohereClient } from 'cohere-ai';
+import OpenAI from 'openai';
+import { getConvexClient } from '../config/convex.js';
+import { api } from '../../../convex/_generated/api.js';
+import { EnhancedMatchingService } from './enhancedMatching.service.js';
+import { matchingCache, CacheService } from './cache.service.js';
+import { PriceItem } from '../types/priceItem.types.js';
+import { withRetry } from '../utils/retry.js';
+
+
+interface MatchingResult {
+  matchedItemId: string;
+  matchedDescription: string;
+  matchedCode: string;
+  matchedUnit: string;
+  matchedRate: number;
+  confidence: number;
+  method?: string;
+}
+
+export class MatchingService {
+  private static instance: MatchingService | null = null;
+  private convex = getConvexClient();
+  private cohereClient: CohereClient | null = null;
+  private openaiClient: OpenAI | null = null;
+  private clientsInitialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
+  private embeddingCache: Map<string, { embedding: number[], provider: 'cohere' | 'openai' }> = new Map();
+
+  constructor() {
+    // Start initialization immediately but don't await
+    this.initializationPromise = this.initializeClients();
+  }
+
+  static getInstance(): MatchingService {
+    if (!MatchingService.instance) {
+      MatchingService.instance = new MatchingService();
+    }
+    return MatchingService.instance;
+  }
+
+  private async initializeClients() {
+    try {
+      // Get API keys from application settings
+      const settings = await this.convex.query(api.applicationSettings.getByKeys, {
+        keys: ['COHERE_API_KEY', 'OPENAI_API_KEY'],
+      });
+
+      const cohereKey = settings.find(s => s.key === 'COHERE_API_KEY')?.value;
+      const openaiKey = settings.find(s => s.key === 'OPENAI_API_KEY')?.value;
+
+      if (cohereKey) {
+        // Cohere client expects the key as 'token'
+        this.cohereClient = new CohereClient({ token: cohereKey });
+        console.log('Cohere client initialized successfully');
+      } else {
+        console.log('No Cohere API key found in settings');
+      }
+
+      if (openaiKey) {
+        // Try both ways to initialize OpenAI client
+        try {
+          this.openaiClient = new OpenAI({ apiKey: openaiKey });
+          console.log('OpenAI client initialized successfully with apiKey');
+        } catch (error) {
+          // If that fails, try setting environment variable
+          process.env.OPENAI_API_KEY = openaiKey;
+          this.openaiClient = new OpenAI();
+          console.log('OpenAI client initialized successfully with OPENAI_API_KEY env var');
+        }
+      } else {
+        console.log('No OpenAI API key found in settings');
+      }
+
+      this.clientsInitialized = true;
+    } catch (error) {
+      console.error('Failed to initialize AI clients:', error);
+      this.clientsInitialized = true; // Mark as initialized even if failed
+    }
+  }
+
+  private async ensureClientsInitialized() {
+    if (!this.clientsInitialized && this.initializationPromise) {
+      await this.initializationPromise;
+    }
+  }
+
+  /**
+   * Create enriched text for embedding that includes description, category, and subcategory
+   */
+  private createEnrichedText(item: PriceItem): string {
+    const parts = [item.description];
+    
+    if (item.category) {
+      parts.push(`Category: ${item.category}`);
+    }
+    
+    if (item.subcategory || item.subCategoryName) {
+      parts.push(`Subcategory: ${item.subcategory || item.subCategoryName}`);
+    }
+    
+    if (item.material_type) {
+      parts.push(`Material: ${item.material_type}`);
+    }
+    
+    if (item.brand) {
+      parts.push(`Brand: ${item.brand}`);
+    }
+    
+    return parts.join(' | ');
+  }
+
+  /**
+   * Pre-generate embeddings for all price items in batches
+   */
+  async generateBatchEmbeddings(
+    priceItems: PriceItem[],
+    provider: 'cohere' | 'openai' = 'cohere'
+  ): Promise<void> {
+    console.log(`[MatchingService] Starting batch embedding generation for ${priceItems.length} items using ${provider}`);
+    
+    if (provider === 'cohere' && !this.cohereClient) {
+      throw new Error('Cohere client not initialized');
+    }
+    
+    if (provider === 'openai' && !this.openaiClient) {
+      throw new Error('OpenAI client not initialized');
+    }
+    
+    // Filter items that need embeddings
+    const itemsNeedingEmbeddings = priceItems.filter(item => {
+      const enrichedText = this.createEnrichedText(item);
+      const cached = this.embeddingCache.get(enrichedText);
+      return !cached || cached.provider !== provider;
+    });
+    
+    if (itemsNeedingEmbeddings.length === 0) {
+      console.log(`[MatchingService] All items already have ${provider} embeddings`);
+      return;
+    }
+    
+    console.log(`[MatchingService] Generating embeddings for ${itemsNeedingEmbeddings.length} items`);
+    
+    const batchSize = provider === 'cohere' ? 96 : 100; // Cohere max 96, OpenAI max 100
+    const batches = [];
+    
+    for (let i = 0; i < itemsNeedingEmbeddings.length; i += batchSize) {
+      batches.push(itemsNeedingEmbeddings.slice(i, i + batchSize));
+    }
+    
+    let totalGenerated = 0;
+    
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const texts = batch.map(item => this.createEnrichedText(item));
+      
+      try {
+        if (provider === 'cohere') {
+          const response = await withRetry(
+            () => this.cohereClient!.embed({
+              texts,
+              model: 'embed-english-v3.0',
+              inputType: 'search_document',
+            }),
+            {
+              maxAttempts: 3,
+              delayMs: 2000,
+              onRetry: (error, attempt) => {
+                console.log(`Cohere batch ${i + 1}/${batches.length} failed (attempt ${attempt}):`, error.message);
+              }
+            }
+          );
+          
+          const embeddings = Array.isArray(response.embeddings) 
+            ? response.embeddings 
+            : (response.embeddings as any).float || [];
+          
+          // Cache embeddings
+          batch.forEach((item, index) => {
+            const enrichedText = this.createEnrichedText(item);
+            this.embeddingCache.set(enrichedText, {
+              embedding: embeddings[index],
+              provider: 'cohere'
+            });
+          });
+          
+          totalGenerated += embeddings.length;
+        } else if (provider === 'openai') {
+          const response = await withRetry(
+            () => this.openaiClient!.embeddings.create({
+              model: 'text-embedding-3-large',
+              input: texts,
+            }),
+            {
+              maxAttempts: 3,
+              delayMs: 2000,
+              onRetry: (error, attempt) => {
+                console.log(`OpenAI batch ${i + 1}/${batches.length} failed (attempt ${attempt}):`, error.message);
+              }
+            }
+          );
+          
+          // Cache embeddings
+          batch.forEach((item, index) => {
+            const enrichedText = this.createEnrichedText(item);
+            this.embeddingCache.set(enrichedText, {
+              embedding: response.data[index].embedding,
+              provider: 'openai'
+            });
+          });
+          
+          totalGenerated += response.data.length;
+        }
+        
+        console.log(`[MatchingService] Batch ${i + 1}/${batches.length} completed. Total generated: ${totalGenerated}`);
+        
+        // Add delay between batches to avoid rate limiting
+        if (i < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        console.error(`Failed to generate ${provider} embeddings for batch ${i + 1}:`, error);
+        throw error;
+      }
+    }
+    
+    console.log(`[MatchingService] Batch embedding generation complete. Generated ${totalGenerated} embeddings`);
+  }
+
+  async matchItem(
+    description: string,
+    method: 'LOCAL' | 'COHERE' | 'OPENAI' | 'HYBRID' | 'ADVANCED' | 'LOCAL_UNIT' | 'HYBRID_CATEGORY',
+    priceItems?: PriceItem[],
+    contextHeaders?: string[]
+  ): Promise<MatchingResult> {
+    const matchStartTime = Date.now();
+    const matchId = `MATCH_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log(`\n[MatchingService] === MATCH START (${matchId}) ===`);
+    console.log(`[MatchingService] Description: "${description.substring(0, 100)}${description.length > 100 ? '...' : ''}"`);
+    console.log(`[MatchingService] Method: ${method}`);
+    console.log(`[MatchingService] Context: ${contextHeaders?.join(' > ') || 'None'}`);
+    console.log(`[MatchingService] Has price items: ${priceItems ? `Yes (${priceItems.length} items)` : 'No'}`);
+    
+    // Ensure AI clients are initialized for methods that need them
+    if (method === 'COHERE' || method === 'OPENAI' || method === 'HYBRID' || method === 'HYBRID_CATEGORY') {
+      console.log(`[MatchingService] Initializing AI clients for ${method}...`);
+      const initStartTime = Date.now();
+      await this.ensureClientsInitialized();
+      console.log(`[MatchingService] AI clients initialized in ${Date.now() - initStartTime}ms`);
+    }
+
+    // Get price items if not provided
+    if (!priceItems) {
+      console.log(`[MatchingService] Loading price items from database...`);
+      const loadStartTime = Date.now();
+      
+      try {
+        priceItems = await withRetry(
+          () => this.convex.query(api.priceItems.getActive),
+          {
+            maxAttempts: 3,
+            delayMs: 1000,
+            onRetry: (error, attempt) => {
+              console.log(`[MatchingService] Failed to fetch price items (attempt ${attempt}):`, error.message);
+            }
+          }
+        );
+        
+        console.log(`[MatchingService] Loaded ${priceItems?.length || 0} price items in ${Date.now() - loadStartTime}ms`);
+        
+        if (!priceItems || priceItems.length === 0) {
+          throw new Error('No price items found in database');
+        }
+      } catch (error) {
+        console.error(`[MatchingService] ERROR: Failed to load price items after ${Date.now() - loadStartTime}ms`);
+        throw new Error(`Failed to load price items: ${error.message}`);
+      }
+    }
+
+    // Preprocess the description
+    const processedDescription = EnhancedMatchingService.preprocessText(description);
+    console.log(`[MatchingService] Processed description: "${processedDescription.substring(0, 80)}..."`);
+
+    let result: MatchingResult;
+    const methodStartTime = Date.now();
+    
+    try {
+      console.log(`[MatchingService] Executing ${method} matching...`);
+      
+      switch (method) {
+        case 'LOCAL':
+          result = await this.localMatch(processedDescription, priceItems, contextHeaders);
+          break;
+        case 'LOCAL_UNIT':
+          result = await this.localUnitMatch(processedDescription, priceItems, contextHeaders);
+          break;
+        case 'COHERE':
+          result = await this.cohereMatch(processedDescription, priceItems, false, contextHeaders);
+          break;
+        case 'OPENAI':
+          result = await this.openaiMatch(processedDescription, priceItems, false, contextHeaders);
+          break;
+        case 'HYBRID':
+          result = await this.hybridMatch(processedDescription, priceItems, contextHeaders);
+          break;
+        case 'HYBRID_CATEGORY':
+          result = await this.hybridCategoryMatch(processedDescription, priceItems, contextHeaders);
+          break;
+        case 'ADVANCED':
+          result = await this.advancedMatch(processedDescription, priceItems, contextHeaders);
+          break;
+        default:
+          throw new Error(`Unknown matching method: ${method}`);
+      }
+      
+      const methodEndTime = Date.now();
+      const totalTime = methodEndTime - matchStartTime;
+      
+      console.log(`[MatchingService] === MATCH COMPLETE (${matchId}) ===`);
+      console.log(`[MatchingService] Method execution time: ${methodEndTime - methodStartTime}ms`);
+      console.log(`[MatchingService] Total match time: ${totalTime}ms`);
+      console.log(`[MatchingService] Match found: ${result.matchedDescription ? 'YES' : 'NO'}`);
+      
+      if (result.matchedDescription) {
+        console.log(`[MatchingService] Matched item:`);
+        console.log(`[MatchingService]   - Description: "${result.matchedDescription.substring(0, 80)}..."`);
+        console.log(`[MatchingService]   - Code: ${result.matchedCode || 'N/A'}`);
+        console.log(`[MatchingService]   - Unit: ${result.matchedUnit || 'N/A'}`);
+        console.log(`[MatchingService]   - Rate: ${result.matchedRate}`);
+        console.log(`[MatchingService]   - Confidence: ${(result.confidence * 100).toFixed(1)}%`);
+      } else {
+        console.log(`[MatchingService] No match found`);
+      }
+      console.log(`[MatchingService] =============================\n`);
+      
+      return result;
+      
+    } catch (error) {
+      const totalTime = Date.now() - matchStartTime;
+      console.error(`[MatchingService] === MATCH ERROR (${matchId}) ===`);
+      console.error(`[MatchingService] Failed after ${totalTime}ms`);
+      console.error(`[MatchingService] Method: ${method}`);
+      console.error(`[MatchingService] Error:`, error);
+      console.error(`[MatchingService] Stack:`, error instanceof Error ? error.stack : 'No stack trace');
+      console.error(`[MatchingService] =============================\n`);
+      throw error;
+    }
+  }
+
+  private async localMatch(description: string, priceItems: PriceItem[], contextHeaders?: string[]): Promise<MatchingResult> {
+    console.log(`[MatchingService/LOCAL] Starting LOCAL match - Description-focused fuzzy matching`);
+    console.log(`[MatchingService/LOCAL] Price items available: ${priceItems.length}`);
+    
+    // Check cache first
+    const cacheKey = CacheService.generateMatchKey(description, 'LOCAL');
+    const cached = matchingCache.get<MatchingResult>(cacheKey);
+    if (cached) {
+      console.log(`[MatchingService/LOCAL] Found cached result`);
+      return cached;
+    }
+
+    console.log(`[MatchingService/LOCAL] No cache hit, performing description-focused fuzzy matching...`);
+    const matchStartTime = Date.now();
+    
+    // LOCAL method focuses purely on description matching
+    const matches: Array<{item: PriceItem, score: number}> = [];
+    
+    for (const item of priceItems) {
+      // Pure description matching - no unit or category weighting
+      const descScore = fuzzball.token_set_ratio(description.toLowerCase(), item.description.toLowerCase());
+      
+      // Only consider items with reasonable description match
+      if (descScore > 50) {
+        matches.push({
+          item,
+          score: descScore
+        });
+      }
+    }
+    
+    // Sort by score
+    matches.sort((a, b) => b.score - a.score);
+    
+    console.log(`[MatchingService/LOCAL] Fuzzy match completed in ${Date.now() - matchStartTime}ms`);
+    console.log(`[MatchingService/LOCAL] Found ${matches.length} potential matches`);
+    
+    if (matches.length > 0) {
+      console.log(`[MatchingService/LOCAL] Top 3 matches (description-only scoring):`);
+      matches.slice(0, 3).forEach((match, index) => {
+        console.log(`[MatchingService/LOCAL]   ${index + 1}. Score: ${match.score.toFixed(1)}, Item: "${match.item.description.substring(0, 60)}..."`);
+      });
+    }
+    
+    if (matches.length === 0) {
+      throw new Error('No suitable match found');
+    }
+
+    const bestMatch = matches[0];
+    const result: MatchingResult = {
+      matchedItemId: bestMatch.item._id,
+      matchedDescription: bestMatch.item.description,
+      matchedCode: bestMatch.item.code || '',
+      matchedUnit: bestMatch.item.unit || '',
+      matchedRate: bestMatch.item.rate,
+      confidence: bestMatch.score / 100,
+      method: 'LOCAL'
+    };
+
+    // Cache the result
+    matchingCache.set(cacheKey, result, 3600); // 1 hour cache
+    
+    return result;
+  }
+
+  private async localUnitMatch(description: string, priceItems: PriceItem[], contextHeaders?: string[]): Promise<MatchingResult> {
+    console.log(`[MatchingService/LOCAL_UNIT] Starting LOCAL_UNIT match - Unit-focused matching`);
+    console.log(`[MatchingService/LOCAL_UNIT] Price items available: ${priceItems.length}`);
+    
+    // Extract unit from description or context
+    let targetUnit: string | undefined;
+    const unitMatch = description.match(/\b(\d+)\s*(M3|M2|M|ITEM|NO|m3|m2|m|item|no)\b/i);
+    if (unitMatch) {
+      targetUnit = unitMatch[2].toUpperCase();
+      console.log(`[MatchingService/LOCAL_UNIT] Extracted unit from description: ${targetUnit}`);
+    }
+    
+    const matches: Array<{item: PriceItem, score: number, breakdown: any}> = [];
+    
+    for (const item of priceItems) {
+      let totalScore = 0;
+      const breakdown = {
+        description: 0,
+        unit: 0,
+        category: 0
+      };
+      
+      // Description matching (30% weight for LOCAL_UNIT)
+      const descScore = fuzzball.token_set_ratio(description.toLowerCase(), item.description.toLowerCase());
+      breakdown.description = descScore * 0.3;
+      
+      // Unit matching (50% weight - THIS IS THE KEY DIFFERENCE)
+      if (targetUnit && item.unit) {
+        const itemUnit = item.unit.toUpperCase();
+        if (targetUnit === itemUnit) {
+          breakdown.unit = 50; // Perfect unit match
+        } else if (this.areUnitsCompatible(targetUnit, itemUnit)) {
+          breakdown.unit = 35; // Compatible units
+        } else {
+          breakdown.unit = 0; // Unit mismatch - heavily penalized
+        }
+      } else if (item.unit) {
+        breakdown.unit = 10; // Small penalty for no target unit
+      }
+      
+      // Category bonus (20% weight)
+      if (contextHeaders && item.category) {
+        const categoryMatch = contextHeaders.some(h => 
+          item.category!.toLowerCase().includes(h.toLowerCase().split(' ')[0])
+        );
+        breakdown.category = categoryMatch ? 20 : 0;
+      }
+      
+      totalScore = breakdown.description + breakdown.unit + breakdown.category;
+      
+      // Only include items with reasonable scores AND matching/compatible units
+      if (totalScore > 30 && (!targetUnit || breakdown.unit > 0)) {
+        matches.push({
+          item,
+          score: totalScore,
+          breakdown
+        });
+      }
+    }
+    
+    // Sort by score
+    matches.sort((a, b) => b.score - a.score);
+    
+    console.log(`[MatchingService/LOCAL_UNIT] Found ${matches.length} matches with unit consideration`);
+    
+    if (matches.length > 0) {
+      console.log(`[MatchingService/LOCAL_UNIT] Top 3 matches (unit-weighted scoring):`);
+      matches.slice(0, 3).forEach((match, index) => {
+        console.log(`[MatchingService/LOCAL_UNIT]   ${index + 1}. Score: ${match.score.toFixed(1)} (Desc: ${match.breakdown.description.toFixed(1)}, Unit: ${match.breakdown.unit}, Cat: ${match.breakdown.category})`);
+        console.log(`[MatchingService/LOCAL_UNIT]      Item: "${match.item.description.substring(0, 50)}..." Unit: ${match.item.unit}`);
+      });
+    }
+    
+    if (matches.length === 0) {
+      // Fall back to regular local match if no unit matches found
+      console.log(`[MatchingService/LOCAL_UNIT] No unit matches found, falling back to description matching`);
+      return this.localMatch(description, priceItems, contextHeaders);
+    }
+
+    const bestMatch = matches[0];
+    return {
+      matchedItemId: bestMatch.item._id,
+      matchedDescription: bestMatch.item.description,
+      matchedCode: bestMatch.item.code || '',
+      matchedUnit: bestMatch.item.unit || '',
+      matchedRate: bestMatch.item.rate,
+      confidence: bestMatch.score / 100,
+      method: 'LOCAL_UNIT'
+    };
+  }
+  
+  private areUnitsCompatible(unit1: string, unit2: string): boolean {
+    const compatibleGroups = [
+      ['M', 'M1', 'LM'],
+      ['M2', 'SQM', 'SM'],
+      ['M3', 'CUM', 'CM'],
+      ['ITEM', 'NO', 'NOS', 'EA', 'EACH', 'PC', 'PCS']
+    ];
+    
+    for (const group of compatibleGroups) {
+      if (group.includes(unit1) && group.includes(unit2)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  private async cohereMatch(description: string, priceItems: PriceItem[], generateEmbeddings: boolean = false, contextHeaders?: string[]): Promise<MatchingResult> {
+    console.log(`[MatchingService/COHERE] Starting Cohere AI match with semantic understanding...`);
+    console.log(`[MatchingService/COHERE] Generate embeddings: ${generateEmbeddings}`);
+    
+    if (!this.cohereClient) {
+      console.error(`[MatchingService/COHERE] ERROR: Cohere client not initialized, falling back to local`);
+      return this.localMatch(description, priceItems, contextHeaders);
+    }
+
+    console.log(`[MatchingService/COHERE] Getting embedding for query...`);
+    const embedStartTime = Date.now();
+    
+    // COHERE UNIQUE: Emphasize technical specifications and context
+    let enrichedQuery = description;
+    if (contextHeaders && contextHeaders.length > 0) {
+      // Cohere focuses more on hierarchical context
+      enrichedQuery = `Construction work: ${contextHeaders.join(' > ')} - ${description}`;
+    }
+    
+    // Extract technical specs for Cohere
+    const specs = this.extractTechnicalSpecs(description);
+    if (specs.length > 0) {
+      enrichedQuery += ` | Specifications: ${specs.join(', ')}`;
+    }
+    
+    // Get embedding for the enriched query
+    const embeddingResponse = await this.cohereClient.embed({
+      texts: [enrichedQuery],
+      model: 'embed-english-v3.0',
+      inputType: 'search_query',
+    });
+    
+    console.log(`[MatchingService/COHERE] Query embedding generated in ${Date.now() - embedStartTime}ms`);
+
+    // Handle Cohere's embedding response format
+    const embeddings = Array.isArray(embeddingResponse.embeddings) 
+      ? embeddingResponse.embeddings 
+      : (embeddingResponse.embeddings as any).float || (embeddingResponse.embeddings as any).int8 || (embeddingResponse.embeddings as any).uint8 || (embeddingResponse.embeddings as any).ubinary || (embeddingResponse.embeddings as any).binary || [];
+    const queryEmbedding = embeddings[0];
+
+    // Get embeddings from cache or database
+    let itemsWithEmbeddings: PriceItem[] = [];
+    
+    // First, ensure all items have embeddings (batch generate if needed)
+    if (generateEmbeddings) {
+      await this.generateBatchEmbeddings(priceItems, 'cohere');
+    }
+    
+    // Get embeddings from cache
+    for (const item of priceItems) {
+      const enrichedText = this.createEnrichedText(item);
+      const cached = this.embeddingCache.get(enrichedText);
+      
+      if (cached && cached.provider === 'cohere') {
+        itemsWithEmbeddings.push({
+          ...item,
+          embedding: cached.embedding,
+          embeddingProvider: 'cohere'
+        });
+      } else if (item.embedding && item.embeddingProvider === 'cohere') {
+        // Use existing embedding but cache it with enriched text
+        itemsWithEmbeddings.push(item);
+        this.embeddingCache.set(enrichedText, {
+          embedding: item.embedding,
+          provider: 'cohere'
+        });
+      }
+    }
+
+
+    if (itemsWithEmbeddings.length === 0) {
+      // Fall back to local matching
+      return this.localMatch(description, priceItems, contextHeaders);
+    }
+
+    // COHERE UNIQUE: Weight by technical similarity and context relevance
+    const scoredMatches: Array<{item: PriceItem, similarity: number, contextBonus: number, finalScore: number}> = [];
+    
+    itemsWithEmbeddings.forEach(item => {
+      const similarity = this.cosineSimilarity(queryEmbedding, item.embedding!);
+      
+      // Cohere-specific: Context matching bonus
+      let contextBonus = 0;
+      if (contextHeaders && item.category) {
+        const categoryWords = item.category.toLowerCase().split(/\s+/);
+        const contextWords = contextHeaders.join(' ').toLowerCase().split(/\s+/);
+        const matchingWords = categoryWords.filter(w => contextWords.includes(w));
+        contextBonus = (matchingWords.length / categoryWords.length) * 0.2; // Up to 20% bonus
+      }
+      
+      // Cohere weights semantic similarity higher
+      const finalScore = (similarity * 0.85) + contextBonus;
+      
+      if (finalScore > 0.4) { // Lower threshold for Cohere
+        scoredMatches.push({ item, similarity, contextBonus, finalScore });
+      }
+    });
+    
+    // Sort by final score
+    scoredMatches.sort((a, b) => b.finalScore - a.finalScore);
+    
+    console.log(`[MatchingService/COHERE] Top 3 Cohere matches:`);
+    scoredMatches.slice(0, 3).forEach((match, idx) => {
+      console.log(`  ${idx + 1}. Score: ${match.finalScore.toFixed(3)} (Sim: ${match.similarity.toFixed(3)}, Context: ${match.contextBonus.toFixed(3)}) - ${match.item.description.substring(0, 50)}...`);
+    });
+    
+    if (scoredMatches.length === 0) {
+      console.log(`[MatchingService/COHERE] No semantic matches found, falling back`);
+      return this.localMatch(description, priceItems, contextHeaders);
+    }
+    
+    const bestMatch = scoredMatches[0];
+    
+    return {
+      matchedItemId: bestMatch.item._id,
+      matchedDescription: bestMatch.item.description,
+      matchedCode: bestMatch.item.code || '',
+      matchedUnit: bestMatch.item.unit || '',
+      matchedRate: bestMatch.item.rate,
+      confidence: bestMatch.finalScore,
+      method: 'COHERE'
+    };
+  }
+
+  private async openaiMatch(description: string, priceItems: PriceItem[], generateEmbeddings: boolean = false, contextHeaders?: string[]): Promise<MatchingResult> {
+    console.log(`[MatchingService/OPENAI] Starting OpenAI match with natural language understanding...`);
+    console.log(`[MatchingService/OPENAI] Generate embeddings: ${generateEmbeddings}`);
+    
+    if (!this.openaiClient) {
+      console.error(`[MatchingService/OPENAI] ERROR: OpenAI client not initialized, falling back to local`);
+      return this.localMatch(description, priceItems, contextHeaders);
+    }
+
+    // OPENAI UNIQUE: Focus on natural language understanding and synonyms
+    let enrichedQuery = description;
+    
+    // OpenAI emphasizes work type and action verbs
+    const workTypes = this.extractWorkTypes(description);
+    if (workTypes.length > 0) {
+      enrichedQuery = `${workTypes.join(' and ')} work: ${description}`;
+    }
+    
+    // Add context as natural language
+    if (contextHeaders && contextHeaders.length > 0) {
+      enrichedQuery += ` | This is part of ${contextHeaders[contextHeaders.length - 1]}`;
+    }
+    
+    // Get embedding for the enriched query
+    const embeddingResponse = await this.openaiClient.embeddings.create({
+      input: enrichedQuery,
+      model: 'text-embedding-3-large',
+    });
+
+    const queryEmbedding = embeddingResponse.data[0].embedding;
+
+    // Get embeddings from cache or database
+    let itemsWithEmbeddings: PriceItem[] = [];
+    
+    // First, ensure all items have embeddings (batch generate if needed)
+    if (generateEmbeddings) {
+      await this.generateBatchEmbeddings(priceItems, 'openai');
+    }
+    
+    // Get embeddings from cache
+    for (const item of priceItems) {
+      const enrichedText = this.createEnrichedText(item);
+      const cached = this.embeddingCache.get(enrichedText);
+      
+      if (cached && cached.provider === 'openai') {
+        itemsWithEmbeddings.push({
+          ...item,
+          embedding: cached.embedding,
+          embeddingProvider: 'openai'
+        });
+      } else if (item.embedding && item.embeddingProvider === 'openai') {
+        // Use existing embedding but cache it with enriched text
+        itemsWithEmbeddings.push(item);
+        this.embeddingCache.set(enrichedText, {
+          embedding: item.embedding,
+          provider: 'openai'
+        });
+      }
+    }
+
+
+    if (itemsWithEmbeddings.length === 0) {
+      // Fall back to local matching
+      return this.localMatch(description, priceItems, contextHeaders);
+    }
+
+    // OPENAI UNIQUE: Focus on semantic similarity with work type understanding
+    const scoredMatches: Array<{item: PriceItem, similarity: number, workTypeBonus: number, unitPenalty: number, finalScore: number}> = [];
+    
+    // Extract unit from query for penalty calculation
+    const queryUnit = this.extractUnit(description);
+    
+    itemsWithEmbeddings.forEach(item => {
+      const similarity = this.cosineSimilarity(queryEmbedding, item.embedding!);
+      
+      // OpenAI-specific: Work type matching bonus
+      let workTypeBonus = 0;
+      const itemWorkTypes = this.extractWorkTypes(item.description);
+      if (workTypes.length > 0 && itemWorkTypes.length > 0) {
+        const commonWorkTypes = workTypes.filter(w => itemWorkTypes.includes(w));
+        workTypeBonus = (commonWorkTypes.length / workTypes.length) * 0.15; // Up to 15% bonus
+      }
+      
+      // OpenAI-specific: Unit mismatch penalty (less strict than LOCAL_UNIT)
+      let unitPenalty = 0;
+      if (queryUnit && item.unit && !this.areUnitsCompatible(queryUnit, item.unit)) {
+        unitPenalty = 0.1; // 10% penalty for unit mismatch
+      }
+      
+      // OpenAI focuses on semantic understanding with moderate penalties
+      const finalScore = (similarity * 0.75) + workTypeBonus - unitPenalty;
+      
+      if (finalScore > 0.45) { // Medium threshold
+        scoredMatches.push({ item, similarity, workTypeBonus, unitPenalty, finalScore });
+      }
+    });
+    
+    // Sort by final score
+    scoredMatches.sort((a, b) => b.finalScore - a.finalScore);
+    
+    console.log(`[MatchingService/OPENAI] Top 3 OpenAI matches:`);
+    scoredMatches.slice(0, 3).forEach((match, idx) => {
+      console.log(`  ${idx + 1}. Score: ${match.finalScore.toFixed(3)} (Sim: ${match.similarity.toFixed(3)}, Work: +${match.workTypeBonus.toFixed(3)}, Unit: -${match.unitPenalty.toFixed(3)}) - ${match.item.description.substring(0, 50)}...`);
+    });
+    
+    if (scoredMatches.length === 0) {
+      console.log(`[MatchingService/OPENAI] No semantic matches found, falling back`);
+      return this.localMatch(description, priceItems, contextHeaders);
+    }
+    
+    const bestMatch = scoredMatches[0];
+    
+    return {
+      matchedItemId: bestMatch.item._id,
+      matchedDescription: bestMatch.item.description,
+      matchedCode: bestMatch.item.code || '',
+      matchedUnit: bestMatch.item.unit || '',
+      matchedRate: bestMatch.item.rate,
+      confidence: bestMatch.finalScore,
+      method: 'OPENAI'
+    };
+  }
+
+  private async hybridMatch(description: string, priceItems: PriceItem[], contextHeaders?: string[]): Promise<MatchingResult> {
+    console.log(`[MatchingService/HYBRID] Starting ensemble matching with voting system...`);
+    
+    const results: Array<{result: MatchingResult, weight: number}> = [];
+    
+    // HYBRID UNIQUE: Run multiple methods in parallel with different weights
+    const methods = [
+      { name: 'LOCAL', weight: 0.2, fn: () => this.localMatch(description, priceItems, contextHeaders) },
+      { name: 'LOCAL_UNIT', weight: 0.3, fn: () => this.localUnitMatch(description, priceItems, contextHeaders) },
+      { name: 'COHERE', weight: 0.25, fn: () => this.cohereMatch(description, priceItems, false, contextHeaders) },
+      { name: 'OPENAI', weight: 0.25, fn: () => this.openaiMatch(description, priceItems, false, contextHeaders) }
+    ];
+    
+    // Execute all methods in parallel
+    const promises = methods.map(async (method) => {
+      try {
+        const result = await method.fn();
+        return { result, weight: method.weight, method: method.name };
+      } catch (error) {
+        console.log(`[MatchingService/HYBRID] ${method.name} failed:`, error.message);
+        return null;
+      }
+    });
+    
+    const allResults = await Promise.all(promises);
+    const validResults = allResults.filter(r => r !== null);
+    
+    if (validResults.length === 0) {
+      throw new Error('No suitable match found using any method');
+    }
+    
+    // HYBRID UNIQUE: Use voting system - if multiple methods agree, boost confidence
+    const votingMap = new Map<string, { totalScore: number, votes: number, bestResult: MatchingResult }>();
+    
+    validResults.forEach(({ result, weight }) => {
+      if (!result) return;
+      
+      const key = result.matchedItemId;
+      const current = votingMap.get(key);
+      
+      if (current) {
+        // Multiple methods agreed on this item
+        current.votes++;
+        current.totalScore += result.confidence * weight;
+        // Keep the result with highest individual confidence
+        if (result.confidence > current.bestResult.confidence) {
+          current.bestResult = result;
+        }
+      } else {
+        votingMap.set(key, {
+          totalScore: result.confidence * weight,
+          votes: 1,
+          bestResult: result
+        });
+      }
+    });
+    
+    // Convert to array and sort by voting score
+    const votingResults = Array.from(votingMap.entries()).map(([itemId, data]) => ({
+      itemId,
+      votingScore: data.totalScore * (1 + (data.votes - 1) * 0.2), // 20% boost per additional vote
+      votes: data.votes,
+      result: data.bestResult
+    }));
+    
+    votingResults.sort((a, b) => b.votingScore - a.votingScore);
+    
+    console.log(`[MatchingService/HYBRID] Voting results:`)
+    votingResults.slice(0, 3).forEach((vr, idx) => {
+      console.log(`  ${idx + 1}. Score: ${vr.votingScore.toFixed(3)}, Votes: ${vr.votes}, Item: ${vr.result.matchedDescription.substring(0, 50)}...`);
+    });
+    
+    const winner = votingResults[0];
+    
+    // HYBRID returns a confidence based on voting consensus
+    const hybridConfidence = Math.min(winner.votingScore / validResults.length, 0.99);
+    
+    return {
+      ...winner.result,
+      confidence: hybridConfidence,
+      method: 'HYBRID'
+    };
+  }
+
+  private async advancedMatch(description: string, priceItems: PriceItem[], contextHeaders?: string[]): Promise<MatchingResult> {
+    console.log(`[MatchingService/ADVANCED] Starting multi-stage pattern matching...`);
+    
+    // Check cache first
+    const cacheKey = CacheService.generateMatchKey(description, 'ADVANCED');
+    const cached = matchingCache.get<MatchingResult>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // ADVANCED UNIQUE: Multi-stage filtering with pattern extraction
+    const stages: Array<{item: PriceItem, score: number, stage: string}> = [];
+    
+    // Stage 1: Code matching (if code pattern detected)
+    const codePattern = /\b[A-Z]{2,3}\d{2,4}\b/;
+    const codeMatch = description.match(codePattern);
+    if (codeMatch) {
+      const code = codeMatch[0];
+      console.log(`[MatchingService/ADVANCED] Stage 1: Code pattern detected: ${code}`);
+      
+      const codeMatches = priceItems.filter(item => 
+        item.code && item.code.toUpperCase().includes(code)
+      );
+      
+      codeMatches.forEach(item => {
+        stages.push({ item, score: 95, stage: 'CODE_MATCH' });
+      });
+    }
+    
+    // Stage 2: Material and specification matching
+    const materials = this.extractMaterials(description);
+    const specs = this.extractTechnicalSpecs(description);
+    
+    if (materials.length > 0 || specs.length > 0) {
+      console.log(`[MatchingService/ADVANCED] Stage 2: Materials: ${materials.join(', ')}, Specs: ${specs.join(', ')}`);
+      
+      priceItems.forEach(item => {
+        let materialScore = 0;
+        let specScore = 0;
+        
+        // Check materials
+        materials.forEach(material => {
+          if (item.description.toLowerCase().includes(material.toLowerCase())) {
+            materialScore += 30;
+          }
+        });
+        
+        // Check specifications
+        specs.forEach(spec => {
+          if (item.description.includes(spec)) {
+            specScore += 25;
+          }
+        });
+        
+        const totalScore = materialScore + specScore;
+        if (totalScore > 0) {
+          // Check if already in stages from code match
+          const existing = stages.find(s => s.item._id === item._id);
+          if (!existing || totalScore > existing.score) {
+            stages.push({ item, score: Math.min(totalScore, 85), stage: 'MATERIAL_SPEC' });
+          }
+        }
+      });
+    }
+    
+    // Stage 3: Pattern-based matching
+    const patterns = this.extractPatterns(description);
+    if (patterns.length > 0) {
+      console.log(`[MatchingService/ADVANCED] Stage 3: Patterns detected: ${patterns.join(', ')}`);
+      
+      const patternMatches = EnhancedMatchingService.enhancedFuzzyMatch(
+        description, 
+        priceItems.filter(item => !stages.some(s => s.item._id === item._id)), // Exclude already matched
+        20,
+        contextHeaders
+      );
+      
+      patternMatches.forEach(match => {
+        if (match.score > 60) {
+          stages.push({ 
+            item: match.item, 
+            score: match.score * 0.8, // Slightly reduce fuzzy scores
+            stage: 'PATTERN_MATCH' 
+          });
+        }
+      });
+    }
+    
+    // Stage 4: Fallback fuzzy matching if no strong matches
+    if (stages.length < 5) {
+      const fuzzyMatches = EnhancedMatchingService.enhancedFuzzyMatch(
+        description,
+        priceItems,
+        10,
+        contextHeaders
+      );
+      
+      fuzzyMatches.forEach(match => {
+        if (!stages.some(s => s.item._id === match.item._id)) {
+          stages.push({
+            item: match.item,
+            score: match.score * 0.7, // Further reduce fuzzy-only scores
+            stage: 'FUZZY_FALLBACK'
+          });
+        }
+      });
+    }
+    
+    // Sort by score and remove duplicates
+    const uniqueStages = new Map<string, typeof stages[0]>();
+    stages.forEach(stage => {
+      const existing = uniqueStages.get(stage.item._id);
+      if (!existing || stage.score > existing.score) {
+        uniqueStages.set(stage.item._id, stage);
+      }
+    });
+    
+    const finalStages = Array.from(uniqueStages.values())
+      .sort((a, b) => b.score - a.score);
+    
+    console.log(`[MatchingService/ADVANCED] Final results by stage:`);
+    finalStages.slice(0, 3).forEach((stage, idx) => {
+      console.log(`  ${idx + 1}. Score: ${stage.score.toFixed(1)}, Stage: ${stage.stage}, Item: ${stage.item.description.substring(0, 50)}...`);
+    });
+    
+    if (finalStages.length === 0) {
+      throw new Error('No suitable match found');
+    }
+
+    const bestMatch = finalStages[0];
+    const result: MatchingResult = {
+      matchedItemId: bestMatch.item._id,
+      matchedDescription: bestMatch.item.description,
+      matchedCode: bestMatch.item.code || '',
+      matchedUnit: bestMatch.item.unit || '',
+      matchedRate: bestMatch.item.rate,
+      confidence: bestMatch.score / 100,
+      method: 'ADVANCED'
+    };
+
+    // Cache the result
+    matchingCache.set(cacheKey, result, 3600); // 1 hour cache
+    
+    return result;
+  }
+
+  private extractKeywords(description: string): string[] {
+    // Common construction keywords
+    const importantWords = [
+      'concrete', 'steel', 'rebar', 'cement', 'brick', 'block', 'pipe',
+      'cable', 'wire', 'paint', 'tile', 'wood', 'glass', 'door', 'window',
+      'excavation', 'foundation', 'slab', 'wall', 'ceiling', 'roof',
+    ];
+
+    const words = description.toLowerCase().split(/\s+/);
+    return words.filter(word => 
+      importantWords.includes(word) || word.length > 5
+    );
+  }
+
+  private extractUnit(description: string): string | null {
+    const unitPatterns = [
+      /\b(m2|sqm|sq\.m|square meter)\b/i,
+      /\b(m3|cum|cu\.m|cubic meter)\b/i,
+      /\b(m|meter|metre|lm|linear meter)\b/i,
+      /\b(kg|kilogram)\b/i,
+      /\b(ton|tonne|mt)\b/i,
+      /\b(no|nos|piece|pcs|unit)\b/i,
+      /\b(l|ltr|liter|litre)\b/i,
+    ];
+
+    for (const pattern of unitPatterns) {
+      const match = description.match(pattern);
+      if (match) {
+        return match[0].toLowerCase();
+      }
+    }
+
+    return null;
+  }
+
+  private areUnitsCompatible(unit1: string, unit2: string): boolean {
+    const unitGroups = [
+      ['m2', 'sqm', 'sq.m', 'square meter'],
+      ['m3', 'cum', 'cu.m', 'cubic meter'],
+      ['m', 'meter', 'metre', 'lm', 'linear meter'],
+      ['kg', 'kilogram'],
+      ['ton', 'tonne', 'mt'],
+      ['no', 'nos', 'piece', 'pcs', 'unit'],
+      ['l', 'ltr', 'liter', 'litre'],
+    ];
+
+    const normalize = (unit: string) => unit.toLowerCase().replace(/\s+/g, '');
+    const norm1 = normalize(unit1);
+    const norm2 = normalize(unit2);
+
+    // Check if units are in the same group
+    for (const group of unitGroups) {
+      const normalizedGroup = group.map(normalize);
+      if (normalizedGroup.includes(norm1) && normalizedGroup.includes(norm2)) {
+        return true;
+      }
+    }
+
+    return norm1 === norm2;
+  }
+
+  private cosineSimilarity(vec1: number[], vec2: number[]): number {
+    if (vec1.length !== vec2.length) {
+      throw new Error('Vectors must have the same length');
+    }
+
+    let dotProduct = 0;
+    let norm1 = 0;
+    let norm2 = 0;
+
+    for (let i = 0; i < vec1.length; i++) {
+      dotProduct += vec1[i] * vec2[i];
+      norm1 += vec1[i] * vec1[i];
+      norm2 += vec2[i] * vec2[i];
+    }
+
+    norm1 = Math.sqrt(norm1);
+    norm2 = Math.sqrt(norm2);
+
+    if (norm1 === 0 || norm2 === 0) {
+      return 0;
+    }
+
+    return dotProduct / (norm1 * norm2);
+  }
+  
+  private extractTechnicalSpecs(description: string): string[] {
+    const specs: string[] = [];
+    
+    // Extract dimensions (e.g., "300x600mm", "2.5m x 1.2m")
+    const dimensionPattern = /\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?\s*(?:mm|cm|m|in|ft)?/gi;
+    const dimensions = description.match(dimensionPattern);
+    if (dimensions) specs.push(...dimensions);
+    
+    // Extract measurements with units
+    const measurementPattern = /\d+(?:\.\d+)?\s*(?:mm|cm|m|km|in|ft|yd|kg|g|ton|l|ml|gal)\b/gi;
+    const measurements = description.match(measurementPattern);
+    if (measurements) specs.push(...measurements.filter(m => !dimensions?.includes(m)));
+    
+    // Extract material specifications (e.g., "Grade 40", "Class A")
+    const gradePattern = /\b(?:grade|class|type|category)\s+[A-Z0-9]+\b/gi;
+    const grades = description.match(gradePattern);
+    if (grades) specs.push(...grades);
+    
+    // Extract standards (e.g., "BS 1234", "ISO 9001")
+    const standardPattern = /\b(?:BS|ISO|DIN|ASTM|EN)\s*\d+(?:[-:]\d+)?\b/gi;
+    const standards = description.match(standardPattern);
+    if (standards) specs.push(...standards);
+    
+    return [...new Set(specs)]; // Remove duplicates
+  }
+  
+  private extractWorkTypes(description: string): string[] {
+    const workTypes: string[] = [];
+    const desc = description.toLowerCase();
+    
+    // Construction work types
+    const workPatterns = {
+      excavation: ['excavat', 'dig', 'trench'],
+      concrete: ['concrete', 'cement', 'mortar', 'grout'],
+      steel: ['steel', 'iron', 'metal', 'rebar'],
+      masonry: ['brick', 'block', 'stone', 'masonry'],
+      carpentry: ['wood', 'timber', 'carpent', 'joiner'],
+      plumbing: ['pipe', 'plumb', 'drain', 'water', 'sewage'],
+      electrical: ['electric', 'wire', 'cable', 'conduit'],
+      painting: ['paint', 'coat', 'finish'],
+      roofing: ['roof', 'tile', 'shingle', 'gutter'],
+      insulation: ['insulat', 'thermal', 'acoustic'],
+      demolition: ['demoli', 'remov', 'strip', 'dismantle']
+    };
+    
+    for (const [workType, keywords] of Object.entries(workPatterns)) {
+      if (keywords.some(keyword => desc.includes(keyword))) {
+        workTypes.push(workType);
+      }
+    }
+    
+    return workTypes;
+  }
+  
+  private extractUnit(description: string): string | undefined {
+    // Match common construction units
+    const unitPattern = /\b(M3|M2|M|ITEM|NO|m3|m2|m|item|no|SQM|sqm|CUM|cum|LM|lm|EA|ea|PC|pc|PCS|pcs|TON|ton|KG|kg)\b/i;
+    const match = description.match(unitPattern);
+    return match ? match[1].toUpperCase() : undefined;
+  }
+  
+  private extractMaterials(description: string): string[] {
+    const materials: string[] = [];
+    const desc = description.toLowerCase();
+    
+    // Common construction materials
+    const materialPatterns = [
+      'concrete', 'cement', 'mortar', 'grout',
+      'steel', 'iron', 'aluminum', 'copper',
+      'brick', 'block', 'stone', 'marble', 'granite',
+      'wood', 'timber', 'plywood', 'mdf',
+      'glass', 'glazing',
+      'pvc', 'plastic', 'polymer',
+      'ceramic', 'tile', 'porcelain',
+      'gypsum', 'plaster',
+      'asphalt', 'bitumen',
+      'sand', 'gravel', 'aggregate'
+    ];
+    
+    materialPatterns.forEach(material => {
+      if (desc.includes(material)) {
+        materials.push(material);
+      }
+    });
+    
+    return materials;
+  }
+  
+  private extractPatterns(description: string): string[] {
+    const patterns: string[] = [];
+    
+    // Size patterns (e.g., "25mm", "100x50")
+    if (/\d+\s*(?:mm|cm|m|inch|ft)/.test(description)) {
+      patterns.push('SIZE_PATTERN');
+    }
+    
+    // Ratio patterns (e.g., "1:3", "1:2:4")
+    if (/\d+:\d+(?::\d+)?/.test(description)) {
+      patterns.push('RATIO_PATTERN');
+    }
+    
+    // Thickness patterns (e.g., "thick", "thickness")
+    if (/\b(?:thick|thickness|depth)\b/i.test(description)) {
+      patterns.push('THICKNESS_PATTERN');
+    }
+    
+    // Installation patterns
+    if (/\b(?:install|fix|lay|apply|mount|erect)\b/i.test(description)) {
+      patterns.push('INSTALLATION_PATTERN');
+    }
+    
+    // Supply patterns
+    if (/\b(?:supply|provide|deliver)\b/i.test(description)) {
+      patterns.push('SUPPLY_PATTERN');
+    }
+    
+    return patterns;
+  }
+
+  private async localUnitMatch(description: string, priceItems: PriceItem[], contextHeaders?: string[]): Promise<MatchingResult> {
+    // Check cache first
+    const cacheKey = CacheService.generateMatchKey(description, 'LOCAL_UNIT');
+    const cached = matchingCache.get<MatchingResult>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Extract unit from the description
+    const queryUnit = EnhancedMatchingService.extractUnit(description);
+    if (!queryUnit) {
+      console.log('No unit found in query, falling back to regular local match');
+      return this.localMatch(description, priceItems, contextHeaders);
+    }
+
+    const processedDescription = EnhancedMatchingService.preprocessText(description);
+    const results: Array<{ item: PriceItem; score: number; unitScore: number }> = [];
+
+    for (const item of priceItems) {
+      const processedItem = EnhancedMatchingService.preprocessText(item.description);
+      
+      // Base fuzzy matching score
+      let baseScore = fuzzball.token_set_ratio(processedDescription, processedItem);
+      
+      // Unit matching score with heavy weight
+      let unitScore = 0;
+      if (item.unit) {
+        if (EnhancedMatchingService.areUnitsCompatible(queryUnit, item.unit)) {
+          const conversionFactor = EnhancedMatchingService.getUnitConversionFactor(queryUnit, item.unit);
+          if (conversionFactor === 1) {
+            unitScore = 100; // Perfect unit match
+          } else if (conversionFactor !== null) {
+            unitScore = 80; // Compatible units (convertible)
+          }
+        } else {
+          unitScore = 0; // Incompatible units - heavily penalize
+          baseScore = baseScore * 0.3; // Reduce base score significantly
+        }
+      }
+
+      // Extract and match keywords
+      const queryKeywords = EnhancedMatchingService.extractKeywords(description);
+      const itemKeywords = EnhancedMatchingService.extractKeywords(item.description);
+      const commonKeywords = queryKeywords.filter(k => itemKeywords.includes(k));
+      const keywordScore = Math.min(commonKeywords.length * 10, 30);
+
+      // Calculate final score with unit priority
+      // Unit matching contributes 50% of the score
+      const finalScore = (unitScore * 0.5) + (baseScore * 0.3) + (keywordScore * 0.2);
+
+      results.push({
+        item,
+        score: finalScore,
+        unitScore
+      });
+    }
+
+    // Sort by score and filter out items with incompatible units
+    const sortedResults = results
+      .filter(r => r.unitScore > 0 || !queryUnit) // Only include items with compatible units
+      .sort((a, b) => b.score - a.score);
+
+    if (sortedResults.length === 0) {
+      // If no items with compatible units found, fall back to regular matching
+      console.log('No items with compatible units found, falling back to regular local match');
+      return this.localMatch(description, priceItems, contextHeaders);
+    }
+
+    const bestMatch = sortedResults[0];
+    const result: MatchingResult = {
+      matchedItemId: bestMatch.item._id,
+      matchedDescription: bestMatch.item.description,
+      matchedCode: bestMatch.item.code || '',
+      matchedUnit: bestMatch.item.unit || '',
+      matchedRate: bestMatch.item.rate,
+      confidence: bestMatch.score / 100,
+      method: 'LOCAL_UNIT'
+    };
+
+    // Cache the result
+    matchingCache.set(cacheKey, result, 3600); // 1 hour cache
+    
+    return result;
+  }
+
+  private async hybridCategoryMatch(description: string, priceItems: PriceItem[], contextHeaders?: string[]): Promise<MatchingResult> {
+    // Extract category information from the description
+    const processedDescription = EnhancedMatchingService.preprocessText(description);
+    const queryKeywords = EnhancedMatchingService.extractKeywords(description);
+    
+    // Identify potential categories from the description
+    const detectedCategories = new Set<string>();
+    for (const [category, keywords] of Object.entries(EnhancedMatchingService['constructionKeywords'])) {
+      if (keywords.some(keyword => processedDescription.includes(keyword.toLowerCase()))) {
+        detectedCategories.add(category);
+      }
+    }
+
+    const results: Array<{ result: MatchingResult; categoryBonus: number }> = [];
+
+    // Try local matching with category boost
+    try {
+      // First, filter items by category if detected
+      let filteredItems = priceItems;
+      if (detectedCategories.size > 0) {
+        const categoryFilteredItems = priceItems.filter(item => 
+          item.category && detectedCategories.has(item.category.toLowerCase())
+        );
+        if (categoryFilteredItems.length > 0) {
+          filteredItems = categoryFilteredItems;
+          console.log(`Filtered to ${filteredItems.length} items in categories: ${Array.from(detectedCategories).join(', ')}`);
+        }
+      }
+
+      const localResult = await this.localMatch(description, filteredItems, contextHeaders);
+      const matchedItem = priceItems.find(item => item._id === localResult.matchedItemId);
+      
+      let categoryBonus = 0;
+      if (matchedItem?.category && detectedCategories.has(matchedItem.category.toLowerCase())) {
+        categoryBonus = 0.3; // 30% bonus for category match
+      }
+
+      results.push({
+        result: {
+          ...localResult,
+          confidence: Math.min(localResult.confidence + categoryBonus, 1.0)
+        },
+        categoryBonus
+      });
+    } catch (error) {
+      console.log('Local match with category filter failed:', error);
+    }
+
+    // Try AI-based matching with category context
+    const categoryContext = detectedCategories.size > 0 
+      ? ` Category context: ${Array.from(detectedCategories).join(', ')}.`
+      : '';
+
+    // Try Cohere with category-aware query
+    if (this.cohereClient) {
+      try {
+        const enhancedDescription = description + categoryContext;
+        const cohereResult = await this.cohereMatch(enhancedDescription, priceItems, true, contextHeaders);
+        const matchedItem = priceItems.find(item => item._id === cohereResult.matchedItemId);
+        
+        let categoryBonus = 0;
+        if (matchedItem?.category && detectedCategories.has(matchedItem.category.toLowerCase())) {
+          categoryBonus = 0.25; // 25% bonus for category match in AI results
+        }
+
+        results.push({
+          result: {
+            ...cohereResult,
+            confidence: Math.min(cohereResult.confidence + categoryBonus, 1.0),
+            method: 'COHERE'
+          },
+          categoryBonus
+        });
+      } catch (error) {
+        console.log('Cohere match failed:', error);
+      }
+    }
+
+    // Try OpenAI with category-aware query
+    if (this.openaiClient) {
+      try {
+        const enhancedDescription = description + categoryContext;
+        const openaiResult = await this.openaiMatch(enhancedDescription, priceItems, true, contextHeaders);
+        const matchedItem = priceItems.find(item => item._id === openaiResult.matchedItemId);
+        
+        let categoryBonus = 0;
+        if (matchedItem?.category && detectedCategories.has(matchedItem.category.toLowerCase())) {
+          categoryBonus = 0.25; // 25% bonus for category match in AI results
+        }
+
+        results.push({
+          result: {
+            ...openaiResult,
+            confidence: Math.min(openaiResult.confidence + categoryBonus, 1.0),
+            method: 'OPENAI'
+          },
+          categoryBonus
+        });
+      } catch (error) {
+        console.log('OpenAI match failed:', error);
+      }
+    }
+
+    if (results.length === 0) {
+      throw new Error('No suitable match found using any method');
+    }
+
+    // Log results for debugging
+    console.log(`HYBRID_CATEGORY match results for "${description}":`, results.map(r => ({
+      method: r.result.method || 'unknown',
+      confidence: r.result.confidence,
+      categoryBonus: r.categoryBonus,
+      description: r.result.matchedDescription,
+      category: priceItems.find(item => item._id === r.result.matchedItemId)?.category || 'none'
+    })));
+
+    // Return the result with highest confidence
+    const bestResult = results.reduce((best, current) => 
+      current.result.confidence > best.result.confidence ? current : best
+    );
+    
+    return {
+      ...bestResult.result,
+      method: 'HYBRID_CATEGORY'
+    };
+  }
+
+  async getTopMatches(
+    description: string, 
+    method: MatchingMethod, 
+    priceItems: PriceItem[], 
+    topN: number = 5,
+    contextHeaders?: string[]
+  ): Promise<MatchingResult[]> {
+    if (method !== 'LOCAL' && method !== 'LOCAL_UNIT') {
+      // For non-local methods, just return the single best match
+      const bestMatch = await this.matchItem(description, method, priceItems, contextHeaders);
+      return [bestMatch];
+    }
+
+    // For local matching, get multiple matches
+    const fuse = new Fuse(priceItems, {
+      keys: [
+        { name: 'description', weight: 0.5 },
+        { name: 'category', weight: 0.2 },
+        { name: 'subcategory', weight: 0.1 },
+        { name: 'subCategoryName', weight: 0.1 },
+        { name: 'keywords', weight: 0.05 },
+        { name: 'code', weight: 0.05 },
+      ],
+      threshold: 0.6,
+      includeScore: true,
+      ignoreLocation: true,
+      minMatchCharLength: 2,
+    });
+
+    const searchResults = fuse.search(description).slice(0, topN);
+    
+    return searchResults.map(result => ({
+      matchedItemId: result.item._id,
+      matchedDescription: result.item.description,
+      matchedCode: result.item.code,
+      matchedUnit: result.item.unit,
+      matchedRate: result.item.rate || 0,
+      confidence: 1 - (result.score || 0),
+      method: method,
+    }));
+  }
+}

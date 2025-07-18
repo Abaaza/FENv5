@@ -1,0 +1,61 @@
+/* Custom scrollbar styles for tables */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thumb-gray-400 {
+  scrollbar-color: #9ca3af #f3f4f6;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+.scrollbar-thin::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Dark mode scrollbar */
+.dark .scrollbar-thin::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Sticky column shadow */
+.sticky {
+  position: sticky;
+}
+
+.sticky.left-0::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(to right, rgba(0,0,0,0.1), transparent);
+  pointer-events: none;
+}
+
+.dark .sticky.left-0::after {
+  background: linear-gradient(to right, rgba(0,0,0,0.3), transparent);
+}

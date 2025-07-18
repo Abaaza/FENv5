@@ -1,0 +1,41 @@
+code,description,unit,rate,supplyOnlyRate,installationRate,category,subcategory,productType,height,width,length,material_type,material_finish,panelType,meshSize,perMeterRate
+POST-T75,"Timber fence post 75x75x1800mm pressure treated",nr,28.00,20.00,8.00,Fencing,Posts,post,1800,75,75,timber,pressure-treated,,,15.56
+POST-T150,"Timber fence post 150x150x3000mm pressure treated",nr,85.00,65.00,20.00,Fencing,Posts,post,3000,150,150,timber,pressure-treated,,,28.33
+POST-MS60,"Mild steel post 60x60x2mm x 2000mm painted",nr,30.00,22.00,8.00,Fencing,Posts,post,2000,60,60,steel,painted,,,15.00
+POST-SS50,"Stainless steel post 50x50x2mm x 1800mm",nr,95.00,80.00,15.00,Fencing,Posts,post,1800,50,50,steel,stainless,,,52.78
+POST-AL60,"Aluminum post 60x60mm x 2400mm powder coated",nr,65.00,50.00,15.00,Fencing,Posts,post,2400,60,60,aluminum,powder-coated,,,27.08
+STRUT-G,"Galvanized straining post strut 2400mm",nr,25.00,18.00,7.00,Fencing,Posts,accessory,2400,,,steel,galvanized,,,
+RAIL-G50,"Galvanized steel rail 50x50mm x 3m",m,15.00,11.00,4.00,Fencing,Rails,rail,,50,3000,steel,galvanized,,,
+RAIL-AL40,"Aluminum rail 40x40mm x 3m powder coated",m,22.00,17.00,5.00,Fencing,Rails,rail,,40,3000,aluminum,powder-coated,,,
+PANEL-WB1800,"Waney edge board panel 1800x1800mm",nr,68.00,52.00,16.00,Fencing,Panels,panel,1800,1800,,timber,pressure-treated,waney-edge,,37.78
+PANEL-PIC1500,"Picket fence panel 1800x1000mm white",nr,75.00,60.00,15.00,Fencing,Panels,panel,1000,1800,,timber,painted,picket,,41.67
+PANEL-COMP1800,"Composite fence panel 1800x1800mm brown",nr,165.00,140.00,25.00,Fencing,Panels,panel,1800,1800,,composite,natural,composite,,91.67
+PANEL-ACOUSTIC,"Acoustic fence panel 2000x500mm",nr,225.00,190.00,35.00,Fencing,Panels,panel,500,2000,,timber,pressure-treated,acoustic,,112.50
+MESH-WELDED-6MM,"Welded mesh 6mm bar galvanized 2400mm high",m2,35.00,28.00,7.00,Fencing,Mesh,fence,2400,,,steel,galvanized,,100x100mm,84.00
+MESH-358,"358 prison mesh (76.2x12.7mm) 2400mm high",m2,48.00,38.00,10.00,Fencing,Mesh,fence,2400,,,steel,galvanized,,76.2x12.7mm,115.20
+MESH-EURO,"Euro fence panel 1630x2500mm",nr,89.00,70.00,19.00,Fencing,Mesh,panel,1630,2500,,steel,galvanized,euro-mesh,50x200mm,35.60
+MESH-V,"V-mesh panel 1800x2500mm green RAL6005",nr,135.00,105.00,30.00,Fencing,Mesh,panel,1800,2500,,steel,powder-coated,v-mesh,50x200mm,54.00
+GATE-T1000,"Timber pedestrian gate 1000x1800mm",nr,195.00,150.00,45.00,Fencing,Gates,gate,1800,1000,,timber,pressure-treated,,,
+GATE-COMP1200,"Composite gate 1200x1800mm with steel frame",nr,485.00,400.00,85.00,Fencing,Gates,gate,1800,1200,,composite,natural,,,
+GATE-AUTO-SWING,"Automatic swing gate kit (per leaf)",set,1250.00,1100.00,150.00,Fencing,Gates,accessory,,,,steel,galvanized,,,
+GATE-AUTO-SLIDE,"Sliding gate motor kit with rail",set,1850.00,1650.00,200.00,Fencing,Gates,accessory,,,,steel,galvanized,,,
+ROLL-FENCE-900,"Rabbit fence roll 900mm x 50m",roll,125.00,110.00,15.00,Fencing,Agricultural,fence,900,,50000,steel,galvanized,,31x150mm,2.50
+ROLL-FENCE-1200,"Stock fence roll 1200mm x 50m",roll,165.00,145.00,20.00,Fencing,Agricultural,fence,1200,,50000,steel,galvanized,,150x150mm,3.30
+ROLL-DEER-1800,"Deer fence roll 1800mm x 50m",roll,285.00,250.00,35.00,Fencing,Agricultural,fence,1800,,50000,steel,galvanized,,150x150mm,5.70
+ELECTRIC-TAPE,"Electric fence tape 40mm x 200m",roll,45.00,42.00,3.00,Fencing,Agricultural,accessory,,40,200000,,plastic,,,
+ELECTRIC-ENERGIZER,"Electric fence energizer 12V solar",nr,325.00,300.00,25.00,Fencing,Agricultural,accessory,,,,,,,,
+BOLLARD-FIXED,"Fixed steel bollard 1000mm galvanized",nr,125.00,95.00,30.00,Fencing,Bollards,post,1000,150,150,steel,galvanized,,,
+BOLLARD-FOLD,"Fold down bollard with lock",nr,225.00,185.00,40.00,Fencing,Bollards,post,900,120,120,steel,galvanized,,,
+BOLLARD-REMOV,"Removable bollard with ground socket",nr,185.00,150.00,35.00,Fencing,Bollards,post,1000,100,100,steel,galvanized,,,
+RAIL-GUARD-W,"W-beam guardrail galvanized per 4m section",nr,125.00,95.00,30.00,Fencing,Safety,rail,750,,4000,steel,galvanized,,,31.25
+RAIL-GUARD-THRIE,"Thrie-beam guardrail galvanized per 4m section",nr,165.00,130.00,35.00,Fencing,Safety,rail,810,,4000,steel,galvanized,,,41.25
+HOARDING-PLY,"Plywood hoarding panel 2400x1220mm",nr,48.00,40.00,8.00,Fencing,Hoarding,panel,2400,1220,,timber,natural,plywood,,20.00
+HOARDING-STEEL,"Steel hoarding panel 2000x2000mm",nr,85.00,70.00,15.00,Fencing,Hoarding,panel,2000,2000,,steel,galvanized,solid,,42.50
+PRIVACY-SCREEN,"Privacy screen slats for chain link (per m2)",m2,28.00,24.00,4.00,Fencing,Accessories,accessory,,,,plastic,various,,,
+ANTI-CLIMB,"Anti-climb rotating pipes 3m section",nr,95.00,75.00,20.00,Fencing,Security,accessory,,100,3000,steel,galvanized,,,31.67
+RAZOR-COIL450,"Razor wire coil 450mm diameter x 10m",nr,85.00,70.00,15.00,Fencing,Security,accessory,450,,10000,steel,galvanized,,,8.50
+RAZOR-FLAT,"Flat wrap razor tape per meter",m,12.00,9.00,3.00,Fencing,Security,accessory,,,,steel,galvanized,,,12.00
+CCTV-MOUNT,"CCTV camera mounting bracket for fence post",nr,45.00,35.00,10.00,Fencing,Security,accessory,,,,steel,galvanized,,,
+FOUND-SPIKE,"Fence post ground spike 750mm",nr,18.00,14.00,4.00,Fencing,Foundations,accessory,750,100,100,steel,galvanized,,,
+FOUND-SHOE,"Bolt down post shoe galvanized",nr,22.00,16.00,6.00,Fencing,Foundations,accessory,,150,150,steel,galvanized,,,
+FOUND-CONCRETE,"Pre-cast concrete fence foundation 600x300x300mm",nr,45.00,38.00,7.00,Fencing,Foundations,accessory,300,300,600,concrete,natural,,,

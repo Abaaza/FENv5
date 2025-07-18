@@ -1,0 +1,56 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Explicitly declare text files
+*.js text
+*.ts text
+*.tsx text
+*.jsx text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.xml text
+*.html text
+*.css text
+*.scss text
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Declare files that will always have LF line endings on checkout
+*.sh text eol=lf
+build-lambda-layer.sh text eol=lf
+deploy.sh text eol=lf
+deploy-*.sh text eol=lf
+azure-*.sh text eol=lf
+setup-*.sh text eol=lf
+
+# Declare files that will always have CRLF line endings on checkout
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Denote all files that are truly binary and should not be modified
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.xlsx binary
+*.xls binary
+*.doc binary
+*.docx binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Exclude files from export
+.gitattributes export-ignore
+.gitignore export-ignore

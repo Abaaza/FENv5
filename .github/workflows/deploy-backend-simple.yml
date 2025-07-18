@@ -1,0 +1,101 @@
+name: Deploy Backend Simple
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy Lambda
+        run: |
+          cd backend
+          
+          # Build
+          npm ci
+          npm run build
+          
+          # Package
+          rm -rf deploy
+          mkdir deploy
+          cp -r dist deploy/
+          cp handler-lambda.js package*.json deploy/
+          cd deploy
+          npm ci --production
+          
+          # Remove unnecessary files to reduce size
+          find . -name "*.map" -delete
+          find . -name "*.md" -delete
+          find . -name "*.ts" -delete
+          find . -name ".DS_Store" -delete
+          rm -rf node_modules/@types
+          rm -rf node_modules/typescript
+          rm -rf node_modules/.cache
+          
+          # Remove test files
+          find . -name "*.test.js" -delete
+          find . -name "*.spec.js" -delete
+          
+          # Remove large packages
+          rm -rf node_modules/@aws-sdk
+          rm -rf node_modules/rxjs
+          rm -rf node_modules/@tanstack
+          rm -rf node_modules/prettier
+          rm -rf node_modules/react-dom
+          rm -rf node_modules/react
+          
+          # CRITICAL: Remove aws-sdk v2 (41MB) - Lambda runtime includes it
+          rm -rf node_modules/aws-sdk
+          
+          # Remove other large unnecessary packages
+          rm -rf node_modules/@babel
+          rm -rf node_modules/eslint*
+          rm -rf node_modules/jest*
+          
+          # Create zip
+          zip -r ../deploy.zip . -q
+          cd ..
+          
+          # Check size
+          ls -lh deploy.zip
+          
+          # Verify size is under 69MB
+          SIZE=$(stat -c%s deploy.zip)
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          echo "Package size: ${SIZE_MB}MB"
+          if [ $SIZE -gt 69000000 ]; then
+            echo "ERROR: Package too large (${SIZE_MB}MB > 69MB)"
+            exit 1
+          fi
+          
+          # Deploy
+          aws lambda update-function-code \
+            --function-name boq-matching-system-prod-api \
+            --zip-file fileb://deploy.zip
+          
+          # Wait for update
+          sleep 20
+          
+          # Test
+          curl https://ls4380art0.execute-api.us-east-1.amazonaws.com/health

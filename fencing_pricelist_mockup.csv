@@ -1,0 +1,42 @@
+code,description,unit,rate,supplyOnlyRate,installationRate,category,subcategory,productType,height,width,length,material_type,material_finish,panelType,meshSize,perMeterRate
+POST-T100,"Timber fence post 100x100x2400mm pressure treated",nr,45.00,32.00,13.00,Fencing,Posts,post,2400,100,100,timber,pressure-treated,,,18.75
+POST-T125,"Timber fence post 125x125x2400mm pressure treated",nr,62.00,45.00,17.00,Fencing,Posts,post,2400,125,125,timber,pressure-treated,,,25.83
+POST-C125,"Concrete fence post 125x125x2400mm slotted",nr,38.00,28.00,10.00,Fencing,Posts,post,2400,125,125,concrete,natural,,,15.83
+POST-C150,"Concrete fence post 150x150x2700mm slotted",nr,52.00,40.00,12.00,Fencing,Posts,post,2700,150,150,concrete,natural,,,19.26
+POST-G60,"Galvanized steel post 60x60x2mm x 2400mm",nr,35.00,25.00,10.00,Fencing,Posts,post,2400,60,60,steel,galvanized,,,14.58
+POST-G80,"Galvanized steel post 80x80x3mm x 2700mm",nr,48.00,35.00,13.00,Fencing,Posts,post,2700,80,80,steel,galvanized,,,17.78
+RAIL-T75,"Timber arris rail 75x75mm x 3.6m pressure treated",m,8.50,6.50,2.00,Fencing,Rails,rail,,75,3600,timber,pressure-treated,,,
+RAIL-T100,"Timber cant rail 100x50mm x 3.6m pressure treated",m,12.00,9.00,3.00,Fencing,Rails,rail,,100,3600,timber,pressure-treated,,,
+PANEL-T1800,"Timber closeboard fence panel 1800x1800mm",nr,95.00,75.00,20.00,Fencing,Panels,panel,1800,1800,,timber,pressure-treated,closeboard,,52.78
+PANEL-T1500,"Timber closeboard fence panel 1800x1500mm",nr,82.00,65.00,17.00,Fencing,Panels,panel,1500,1800,,timber,pressure-treated,closeboard,,45.56
+PANEL-HM1800,"Timber hit & miss fence panel 1800x1800mm",nr,110.00,88.00,22.00,Fencing,Panels,panel,1800,1800,,timber,pressure-treated,hit-and-miss,,61.11
+PANEL-C300,"Concrete gravel board 300x1830mm",nr,28.00,22.00,6.00,Fencing,Panels,panel,300,1830,,concrete,natural,gravel-board,,15.30
+PANEL-C150,"Concrete fence panel 150x1830mm plain",nr,42.00,35.00,7.00,Fencing,Panels,panel,150,1830,,concrete,natural,plain,,22.95
+MESH-CL50-1200,"Chain link mesh 50mm x 3mm galvanized 1200mm high",m2,18.50,14.00,4.50,Fencing,Mesh,fence,1200,,,steel,galvanized,,50mm,22.20
+MESH-CL50-1800,"Chain link mesh 50mm x 3mm galvanized 1800mm high",m2,22.00,16.50,5.50,Fencing,Mesh,fence,1800,,,steel,galvanized,,50mm,39.60
+MESH-PC-1800,"Powder coated welded mesh panel 1800x2500mm green",nr,125.00,95.00,30.00,Fencing,Mesh,panel,1800,2500,,steel,powder-coated,welded-mesh,50x200mm,50.00
+MESH-PC-2000,"Powder coated welded mesh panel 2000x2500mm green",nr,145.00,110.00,35.00,Fencing,Mesh,panel,2000,2500,,steel,powder-coated,welded-mesh,50x200mm,58.00
+GATE-S900,"Single pedestrian gate 900x1800mm galvanized",nr,285.00,220.00,65.00,Fencing,Gates,gate,1800,900,,steel,galvanized,,,
+GATE-S1200,"Single pedestrian gate 1200x1800mm galvanized",nr,320.00,250.00,70.00,Fencing,Gates,gate,1800,1200,,steel,galvanized,,,
+GATE-D3000,"Double vehicle gate 3000x1800mm galvanized",nr,680.00,550.00,130.00,Fencing,Gates,gate,1800,3000,,steel,galvanized,,,
+GATE-D4000,"Double vehicle gate 4000x1800mm galvanized",nr,850.00,700.00,150.00,Fencing,Gates,gate,1800,4000,,steel,galvanized,,,
+GATE-FE1200,"Fire exit gate 1200x2000mm powder coated",nr,420.00,350.00,70.00,Fencing,Gates,gate,2000,1200,,steel,powder-coated,,,
+GATE-B6000,"Automatic barrier gate 6m arm",nr,2850.00,2500.00,350.00,Fencing,Gates,gate,,6000,,steel,powder-coated,,,
+PAL-1800,"Palisade fencing 1800mm high galvanized",m,65.00,48.00,17.00,Fencing,Palisade,fence,1800,,,steel,galvanized,palisade,,65.00
+PAL-2400,"Palisade fencing 2400mm high galvanized",m,85.00,65.00,20.00,Fencing,Palisade,fence,2400,,,steel,galvanized,palisade,,85.00
+WIRE-STRAIN,"Straining wire 3.15mm galvanized",m,1.20,0.80,0.40,Fencing,Accessories,accessory,,,,steel,galvanized,,,
+WIRE-BARB,"Barbed wire 2.5mm galvanized",m,2.50,1.80,0.70,Fencing,Accessories,accessory,,,,steel,galvanized,,,
+FIX-BOLT,"Fence panel fixing bolt set (pack of 4)",set,8.50,6.50,2.00,Fencing,Accessories,accessory,,,,steel,galvanized,,,
+FIX-CLIP,"Fence panel clip galvanized (pack of 10)",set,12.00,9.00,3.00,Fencing,Accessories,accessory,,,,steel,galvanized,,,
+CONC-POST,"Postcrete fast setting concrete 20kg",bag,8.50,8.50,0.00,Fencing,Materials,accessory,,,,concrete,natural,,,
+PAINT-FENCE,"Fence paint/stain 5L various colors",tin,32.00,32.00,0.00,Fencing,Materials,accessory,,,,,,,,
+BT-B-R,"BT spec concrete post and panel fence 2000mm",lin.m,145.00,110.00,35.00,Fencing,Complete Systems,fence,2000,,,concrete,natural,bt-spec,,145.00
+TIM-PR-1800,"Complete timber post & rail fence 1800mm high",lin.m,85.00,65.00,20.00,Fencing,Complete Systems,fence,1800,,,timber,pressure-treated,post-and-rail,,85.00
+CL-SYSTEM-1500,"Complete chain link fence system 1500mm high",lin.m,55.00,40.00,15.00,Fencing,Complete Systems,fence,1500,,,steel,galvanized,chain-link,50mm,55.00
+MESH-SYSTEM-2000,"Complete mesh panel system 2000mm high green",lin.m,98.00,75.00,23.00,Fencing,Complete Systems,fence,2000,,,steel,powder-coated,mesh-panel,50x200mm,98.00
+SEC-FENCE-2400,"High security mesh fence 2400mm with razor wire",lin.m,185.00,145.00,40.00,Fencing,Security,fence,2400,,,steel,galvanized,security-mesh,76x12mm,185.00
+TEMP-PANEL,"Temporary fence panel 2000x3500mm",nr,65.00,55.00,10.00,Fencing,Temporary,panel,2000,3500,,steel,galvanized,temporary,,18.57
+TEMP-FOOT,"Temporary fence concrete foot",nr,12.00,10.00,2.00,Fencing,Temporary,accessory,,,,concrete,natural,,,
+G1,"Galvanized single gate Type 1 - 1000mm",nr,295.00,230.00,65.00,Fencing,Gates,gate,1800,1000,,steel,galvanized,,,
+G2,"Galvanized double gate Type 2 - 3500mm",nr,725.00,590.00,135.00,Fencing,Gates,gate,1800,3500,,steel,galvanized,,,
+G3,"Galvanized sliding gate Type 3 - 5000mm",nr,1850.00,1600.00,250.00,Fencing,Gates,gate,2000,5000,,steel,galvanized,,,

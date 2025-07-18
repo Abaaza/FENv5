@@ -1,0 +1,153 @@
+// PATCH: Enhanced Category + Subcategory Matching
+// Apply these changes to matching.service.ts
+
+// 1. Replace the createEnrichedText method (around line 124) with this enhanced version:
+
+private createEnrichedText(item: PriceItem, contextHeaders?: string[]): string {
+  const parts = [item.description];
+  
+  // Add context headers if provided
+  if (contextHeaders && contextHeaders.length > 0) {
+    parts.push(`Context: ${contextHeaders.join(' > ')}`);
+  }
+  
+  // Emphasize category + subcategory combination for better matching
+  if (item.category && item.subcategory) {
+    // Repeat the combination for stronger embedding signal
+    parts.push(`Category: ${item.category} - ${item.subcategory}`);
+    parts.push(`Classification: ${item.category} ${item.subcategory}`);
+    parts.push(`Type: ${item.category}/${item.subcategory}`);
+  } else if (item.category) {
+    parts.push(`Category: ${item.category}`);
+    parts.push(`Type: ${item.category}`);
+  }
+  
+  if (item.unit) {
+    parts.push(`Unit: ${item.unit}`);
+  }
+  
+  if (item.keywords && item.keywords.length > 0) {
+    parts.push(`Keywords: ${item.keywords.join(', ')}`);
+  }
+  
+  if (item.code) {
+    parts.push(`Code: ${item.code}`);
+  }
+  
+  return parts.join(' | ');
+}
+
+// 2. Replace the category matching section in localMatch (lines 361-387) with:
+
+// Enhanced category + subcategory matching as a combined unit
+if (contextHeaders && contextHeaders.length > 0) {
+  let categoryScore = 0;
+  
+  // Extract potential category and subcategory from context headers
+  const potentialCategory = contextHeaders[0]?.toLowerCase() || '';
+  const potentialSubcategory = contextHeaders[1]?.toLowerCase() || '';
+  
+  // Check for exact category + subcategory match (highest priority)
+  if (item.category && item.subcategory) {
+    const itemCategory = item.category.toLowerCase();
+    const itemSubcategory = item.subcategory.toLowerCase();
+    
+    // Exact category + subcategory match = maximum bonus
+    if (potentialCategory && potentialSubcategory &&
+        fuzz.ratio(potentialCategory, itemCategory) > 85 &&
+        fuzz.ratio(potentialSubcategory, itemSubcategory) > 85) {
+      categoryScore = 30; // Significant boost for exact category+subcategory match
+    }
+    // Category matches but different subcategory
+    else if (potentialCategory && fuzz.ratio(potentialCategory, itemCategory) > 85) {
+      categoryScore = 15; // Medium boost for category-only match
+      
+      // Check if any context header matches subcategory
+      const subcategoryMatches = contextHeaders.map(header => 
+        fuzz.partial_ratio(header.toLowerCase(), itemSubcategory)
+      );
+      if (Math.max(...subcategoryMatches) > 70) {
+        categoryScore += 10; // Additional boost if subcategory found in context
+      }
+    }
+    // Subcategory matches but different category (less common but possible)
+    else if (potentialSubcategory && fuzz.ratio(potentialSubcategory, itemSubcategory) > 85) {
+      categoryScore = 10;
+    }
+  }
+  // Fallback to category-only matching if no subcategory
+  else if (item.category && potentialCategory) {
+    const itemCategory = item.category.toLowerCase();
+    if (fuzz.ratio(potentialCategory, itemCategory) > 85) {
+      categoryScore = 20;
+    }
+  }
+  
+  scoreBreakdown.category = categoryScore;
+}
+
+// 3. In cohereMatch method, update the enrichedQuery building (around line 469):
+
+// Build enriched query with full context and construction patterns
+let enrichedQuery = description;
+const expandedDescription = ConstructionPatternsService.expandAbbreviations(description);
+const queryFeatures = ConstructionPatternsService.extractConstructionFeatures(description);
+
+// Extract category/subcategory from context for stronger matching
+let categoryContext = '';
+if (contextHeaders && contextHeaders.length > 0) {
+  const potentialCategory = contextHeaders[0] || '';
+  const potentialSubcategory = contextHeaders[1] || '';
+  categoryContext = `Target Category: ${potentialCategory}. Target Subcategory: ${potentialSubcategory}.`;
+  
+  const fullContext = contextHeaders.join(' > ');
+  enrichedQuery = `${categoryContext} Category: ${fullContext}. Task: ${expandedDescription}`;
+} else {
+  enrichedQuery = expandedDescription;
+}
+
+// 4. After calculating similarities in COHERE method (after line 561), add:
+
+// Boost scores for category+subcategory matches
+if (contextHeaders && contextHeaders.length >= 2) {
+  const targetCategory = contextHeaders[0]?.toLowerCase() || '';
+  const targetSubcategory = contextHeaders[1]?.toLowerCase() || '';
+  
+  scoredMatches.forEach(match => {
+    const itemCategory = match.item.category?.toLowerCase() || '';
+    const itemSubcategory = match.item.subcategory?.toLowerCase() || '';
+    
+    // Strong boost for exact category+subcategory match
+    if (targetCategory && targetSubcategory &&
+        itemCategory.includes(targetCategory) && 
+        itemSubcategory.includes(targetSubcategory)) {
+      match.similarity = Math.min(0.99, match.similarity * 1.3); // 30% boost
+    }
+    // Medium boost for category-only match
+    else if (targetCategory && itemCategory.includes(targetCategory)) {
+      match.similarity = Math.min(0.95, match.similarity * 1.15); // 15% boost
+    }
+  });
+}
+
+// 5. Apply the same boosting logic to OPENAI method (after similarity calculation)
+
+// 6. Update the matching details reasoning to include category/subcategory info:
+// In LOCAL method result (around line 439):
+reasoning: `Composite match: ${bestMatch.breakdown.fuzzy.toFixed(0)}% description, ` +
+           `${bestMatch.breakdown.unit}pts unit, ${bestMatch.breakdown.category}pts category${bestMatch.item.subcategory ? '+subcategory' : ''}, ` +
+           `${bestMatch.breakdown.keywords}pts keywords`
+
+// In COHERE/OPENAI results, add category match info:
+const categoryMatch = contextHeaders && bestMatch.item.category && 
+                     contextHeaders[0]?.toLowerCase().includes(bestMatch.item.category.toLowerCase());
+const subcategoryMatch = contextHeaders && bestMatch.item.subcategory && 
+                        contextHeaders.some(h => h.toLowerCase().includes(bestMatch.item.subcategory.toLowerCase()));
+
+// Add to matchingDetails:
+factors: [
+  'semantic_similarity',
+  queryUnit && 'unit_compatibility',
+  categoryMatch && 'category_match',
+  subcategoryMatch && 'subcategory_match'
+].filter(Boolean)

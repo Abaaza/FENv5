@@ -1,0 +1,47 @@
+{
+  "name": "the-fencing-people-price-matcher",
+  "version": "1.0.0",
+  "description": "The Fencing People Price Matcher - AI-powered price matching system",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev:convex & npm run dev:backend & npm run dev:frontend",
+    "dev:convex": "convex dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:convex && npm run build:backend && npm run build:frontend",
+    "build:convex": "convex deploy",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "build:all": "cd backend && npm install --production=false && npm run build && cd ../frontend && npm install --production=false && npm run build",
+    "build:production": "npm run build:convex && npm run build:all",
+    "build:azure": "npm run install:all && npm run build:backend && npm run build:frontend && npm run prepare:azure",
+    "prepare:azure": "mkdir -p backend/public && cp -r frontend/dist/* backend/public/",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install && cd ..",
+    "start": "cd backend && npm start"
+  },
+  "keywords": [
+    "construction",
+    "boq",
+    "price-matching"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "convex": "^1.25.2",
+    "@vercel/blob": "^0.19.0",
+    "@vercel/node": "^3.0.0",
+    "formidable": "^3.5.1",
+    "node-fetch": "^3.3.2",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "axios": "^1.6.2",
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/formidable": "^3.4.5",
+    "@types/node": "^20.0.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.5"
+  }
+}

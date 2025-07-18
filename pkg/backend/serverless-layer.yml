@@ -1,0 +1,76 @@
+service: boq-matching-system
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  stage: ${opt:stage, 'prod'}
+  environment:
+    NODE_ENV: production
+    CONVEX_URL: ${env:CONVEX_URL, 'https://good-dolphin-454.convex.cloud'}
+    JWT_ACCESS_SECRET: ${env:JWT_ACCESS_SECRET, 'mjd-boq-access-secret-2025'}
+    JWT_REFRESH_SECRET: ${env:JWT_REFRESH_SECRET, 'mjd-boq-refresh-secret-2025'}
+    FRONTEND_URL: ${env:FRONTEND_URL, '*'}
+  httpApi:
+    cors:
+      allowedOrigins:
+        - '*'
+      allowedHeaders:
+        - '*'
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      allowCredentials: false
+
+# Use layers to separate dependencies from code
+layers:
+  nodeModules:
+    path: lambda-layer
+    description: Node modules for BOQ matching system
+    compatibleRuntimes:
+      - nodejs20.x
+
+functions:
+  # Main HTTP API handler (30 second timeout limit)
+  app:
+    handler: handler.handler
+    layers:
+      - {Ref: NodeModulesLambdaLayer}
+    events:
+      - httpApi: '*'
+    timeout: 30
+    memorySize: 2048
+  
+  # Async job processor (15 minute timeout)
+  processJob:
+    handler: async-handler.processJobAsync
+    layers:
+      - {Ref: NodeModulesLambdaLayer}
+    timeout: 900
+    memorySize: 2048
+
+package:
+  patterns:
+    # Include only code files
+    - 'dist/**'
+    - 'handler.js'
+    - 'async-handler.js'
+    - 'package.json'
+    # Exclude everything else
+    - '!node_modules/**'
+    - '!src/**'
+    - '!tests/**'
+    - '!*.ts'
+    - '!*.map'
+    - '!uploads/**'
+    - '!logs/**'
+    - '!*.csv'
+    - '!*.xlsx'
+    - '!*.json'
+    - 'package.json'
+    - '!*.tar.gz'
+    - '!*.zip'

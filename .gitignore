@@ -1,0 +1,172 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+
+# Production
+build/
+dist/
+out/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.bak
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+temp_uploads/
+uploads/
+
+# Windows temp files
+backend/C*Users*
+backend/*AppData*
+backend/nul
+nul
+**/nul
+backend/lambda-deploy/
+backend/lambda-full-deploy/
+backend/lambda-deploy.zip
+backend/deployment.zip
+backend/emergency-handler.zip
+
+# Backend specific
+backend/node_modules/
+backend/dist/
+backend/logs/
+backend/.env
+backend/.serverless/
+backend/uploads/
+backend/.serverless-gitignore
+backend/.serverlessignore
+backend/public/
+backend/handler.js
+backend/lambda.js
+backend/async-handler.js
+backend/index.js
+backend/build-emergency.js
+backend/deploy-minimal.zip
+backend/mjd_consolidated_pricelist.json
+backend/package-lambda.json
+backend/prepare-lambda.js
+backend/test-handler.js
+backend/test-files/
+backend/scripts/*.js
+backend/serverless.yml
+backend/serverless-layer.yml
+backend/tsconfig.lambda.json
+
+# Frontend specific
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.example
+frontend/tsconfig.prod.json
+
+# Convex
+convex/_generated/
+
+# Deployment files
+*.zip
+*.tar
+*.tar.gz
+deploy-*.ps1
+deploy-*.bat
+deploy.cmd
+# Keep EC2 deployment scripts
+!deploy-ec2.sh
+!deploy-to-ec2.sh
+!manage-ec2.sh
+deployment-*.json
+azure-*.ps1
+azure-*.sh
+azure-*.md
+check-*.ps1
+fix-*.ps1
+test-*.ps1
+update-*.ps1
+set-*.ps1
+setup-*.ps1
+create-*.ps1
+build-*.bat
+clean-*.ps1
+clear-*.ps1
+diagnose-*.ps1
+emergency-*.ps1
+final-*.ps1
+find-*.ps1
+force-*.ps1
+generate-*.js
+list-*.ps1
+quick-*.ps1
+rebuild-*.ps1
+recreate-*.ps1
+redeploy-*.ps1
+restore-*.ps1
+simple-*.ps1
+use-*.ps1
+verify-*.ps1
+view-*.ps1
+vercel-*.md
+serverless.yml
+lambda-env.json
+trust-policy.json
+web.config
+startup.sh
+exclude-deploy.txt
+frontend-lambda.js
+debug-auth.js
+test-convex-directly.js
+extract_pricelist.py
+DEPLOYMENT_GUIDE.md
+AWS_BACKEND_DEPLOYMENT.md
+AZURE_DEPLOYMENT_GUIDE.md
+AZURE_DEPLOYMENT_HASSLE_FREE.md
+VERCEL_FRONTEND_DEPLOYMENT.md
+add-dashboard-endpoints.ps1
+
+# App logs
+app-logs/
+app-logs.zip
+
+# Test apps
+test-app/
+
+# Excel files (already tracked ones will remain)
+*.xlsx
+!backend/src/tests/test-boq.xlsx
+
+# Temporary working files
+.deployment
+.deployment-config.ps1

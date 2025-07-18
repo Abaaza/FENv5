@@ -1,0 +1,206 @@
+name: Deploy Full Stack
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_backend:
+        description: 'Deploy Backend'
+        required: true
+        default: 'true'
+        type: boolean
+      deploy_frontend:
+        description: 'Deploy Frontend'
+        required: true
+        default: 'true'
+        type: boolean
+
+jobs:
+  deploy-backend:
+    if: github.event_name == 'push' || github.event.inputs.deploy_backend == 'true'
+    runs-on: ubuntu-latest
+    name: Deploy Backend to Lambda
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy Backend
+        run: |
+          cd backend
+          
+          # Install dependencies
+          npm ci
+          
+          # Build
+          npm run build
+          
+          # Create deployment package
+          mkdir -p deploy-package
+          cp -r dist/* deploy-package/
+          cp handler-lambda.js package*.json deploy-package/
+          
+          cd deploy-package
+          npm ci --production --omit=dev
+          
+          # Clean up unnecessary files
+          find node_modules -type f -name "*.md" -delete 2>/dev/null || true
+          find node_modules -type f -name "*.txt" -delete 2>/dev/null || true
+          find node_modules -type f -name "*.map" -delete 2>/dev/null || true
+          find node_modules -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "docs" -exec rm -rf {} + 2>/dev/null || true
+          
+          # Create zip
+          zip -r ../lambda-deploy.zip . -q
+          cd ..
+          
+          # Deploy to Lambda
+          aws lambda update-function-code \
+            --function-name boq-matching-system-prod-api \
+            --zip-file fileb://lambda-deploy.zip
+          
+          # Update configuration
+          aws lambda update-function-configuration \
+            --function-name boq-matching-system-prod-api \
+            --handler handler-lambda.handler \
+            --timeout 900 \
+            --memory-size 3008 \
+            --environment Variables="{
+              NODE_ENV=production,
+              JWT_SECRET='${{ secrets.JWT_SECRET }}',
+              JWT_REFRESH_SECRET='${{ secrets.JWT_REFRESH_SECRET }}',
+              CONVEX_URL='${{ secrets.CONVEX_URL }}',
+              AWS_S3_BUCKET=mjd-boq-uploads-prod,
+              S3_BUCKET_NAME=mjd-boq-uploads-prod,
+              FRONTEND_URL='${{ secrets.FRONTEND_URL }}',
+              ALLOWED_ORIGINS='*',
+              MAX_FILE_SIZE=52428800,
+              ALLOWED_FILE_TYPES='.xlsx,.xls',
+              PORT=5000,
+              COOKIE_SECURE=true,
+              COOKIE_HTTPONLY=true,
+              COOKIE_SAMESITE=none,
+              RATE_LIMIT_WINDOW_MS=900000,
+              RATE_LIMIT_MAX_REQUESTS=100
+            }"
+
+  deploy-frontend:
+    if: github.event_name == 'push' || github.event.inputs.deploy_frontend == 'true'
+    runs-on: ubuntu-latest
+    name: Deploy Frontend to Amplify
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Build Frontend
+        env:
+          VITE_API_URL: https://ls4380art0.execute-api.us-east-1.amazonaws.com/api
+          VITE_CONVEX_URL: ${{ secrets.CONVEX_URL }}
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Deploy to Amplify
+        run: |
+          # Get Amplify app ID
+          APP_ID=$(aws amplify list-apps --query "apps[?name=='boq-matching-system'].appId" --output text)
+          
+          if [ -z "$APP_ID" ]; then
+            echo "Amplify app not found. Creating new app..."
+            # Create new Amplify app if it doesn't exist
+            aws amplify create-app \
+              --name boq-matching-system \
+              --platform WEB \
+              --repository https://github.com/${{ github.repository }}
+          else
+            echo "Found Amplify app: $APP_ID"
+          fi
+          
+          # Create deployment
+          cd frontend
+          zip -r ../frontend-build.zip dist/* -q
+          cd ..
+          
+          # Upload to S3
+          aws s3 cp frontend-build.zip s3://mjd-boq-uploads-prod/deployments/frontend-build.zip
+          
+          # Trigger Amplify deployment
+          aws amplify start-deployment \
+            --app-id $APP_ID \
+            --branch-name main \
+            --source-url s3://mjd-boq-uploads-prod/deployments/frontend-build.zip
+
+  test-deployment:
+    needs: [deploy-backend, deploy-frontend]
+    if: always()
+    runs-on: ubuntu-latest
+    name: Test Deployment
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test Backend Health
+        run: |
+          echo "Waiting for services to stabilize..."
+          sleep 30
+          
+          echo "Testing Backend API..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://ls4380art0.execute-api.us-east-1.amazonaws.com/health)
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Backend is healthy"
+          else
+            echo "❌ Backend health check failed with status $response"
+            exit 1
+          fi
+
+      - name: Test Frontend
+        run: |
+          echo "Testing Frontend..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://main.d3j084kic0l1ff.amplifyapp.com/)
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Frontend is accessible"
+          else
+            echo "❌ Frontend check failed with status $response"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "🚀 Deployment Summary:"
+          echo "Backend: ${{ needs.deploy-backend.result }}"
+          echo "Frontend: ${{ needs.deploy-frontend.result }}"
