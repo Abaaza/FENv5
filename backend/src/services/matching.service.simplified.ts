@@ -44,8 +44,8 @@ export class SimplifiedMatchingService {
     if (this.cohereClient && this.openaiClient) return;
     
     const settings = await this.convex.query(api.applicationSettings.getAll);
-    const cohereKey = settings.find(s => s.key === 'COHERE_API_KEY')?.value;
-    const openaiKey = settings.find(s => s.key === 'OPENAI_API_KEY')?.value;
+    const cohereKey = settings.find(s => s.key === 'V2_API_KEY')?.value;
+    const openaiKey = settings.find(s => s.key === 'V1_API_KEY')?.value;
     
     if (cohereKey && !this.cohereClient) {
       this.cohereClient = new CohereClient({ token: cohereKey });
@@ -146,12 +146,12 @@ export class SimplifiedMatchingService {
    */
   async matchItem(
     description: string,
-    method: 'LOCAL' | 'COHERE' | 'OPENAI',
+    method: 'LOCAL' | 'V2' | 'V1',
     providedPriceItems?: PriceItem[],
     contextHeaders?: string[]
   ): Promise<MatchingResult> {
     // Initialize AI clients if needed
-    if (['COHERE', 'OPENAI'].includes(method)) {
+    if (['V2', 'V1'].includes(method)) {
       await this.ensureClientsInitialized();
     }
 
@@ -160,9 +160,9 @@ export class SimplifiedMatchingService {
     switch (method) {
       case 'LOCAL':
         return this.localMatch(description, priceItems, contextHeaders);
-      case 'COHERE':
+      case 'V2':
         return this.cohereMatch(description, priceItems, contextHeaders);
-      case 'OPENAI':
+      case 'V1':
         return this.openAIMatch(description, priceItems, contextHeaders);
       default:
         throw new Error(`Unknown matching method: ${method}`);
@@ -272,7 +272,7 @@ export class SimplifiedMatchingService {
         const cacheKey = `cohere_${itemText}`;
         let embedding = this.embeddingCache.get(cacheKey);
         
-        if (!embedding && item.embedding && item.embeddingProvider === 'cohere') {
+        if (!embedding && item.embedding && item.embeddingProvider === 'V2') {
           embedding = item.embedding;
           this.embeddingCache.set(cacheKey, embedding);
         }
@@ -328,7 +328,7 @@ export class SimplifiedMatchingService {
       matchedUnit: bestMatch.item.unit || '',
       matchedRate: bestMatch.item.rate,
       confidence: bestMatch.score,
-      method: 'COHERE'
+      method: 'V2'
     };
   }
 
@@ -369,7 +369,7 @@ export class SimplifiedMatchingService {
 
     // Score items that have embeddings
     const scoredItems = priceItems
-      .filter(item => item.embedding && item.embeddingProvider === 'openai')
+      .filter(item => item.embedding && item.embeddingProvider === 'V1')
       .map(item => {
         const similarity = this.cosineSimilarity(queryEmbedding, item.embedding!);
         
@@ -401,7 +401,7 @@ export class SimplifiedMatchingService {
       matchedUnit: bestMatch.item.unit || '',
       matchedRate: bestMatch.item.rate,
       confidence: bestMatch.score,
-      method: 'OPENAI'
+      method: 'V1'
     };
   }
 
@@ -425,3 +425,4 @@ export class SimplifiedMatchingService {
     return denominator === 0 ? 0 : dotProduct / denominator;
   }
 }
+

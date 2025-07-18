@@ -1,4 +1,4 @@
-﻿export interface PriceItem {
+export interface PriceItem {
   _id: string;
   id: string;
   code?: string;
@@ -32,10 +32,11 @@
   vendor?: string;
   // Embedding fields
   embedding?: number[];
-  embeddingProvider?: 'cohere' | 'openai';
+  embeddingProvider?: 'V2' | 'V1';
   // Metadata
   isActive: boolean;
   createdAt: number;
   updatedAt: number;
   createdBy: string;
 }
+

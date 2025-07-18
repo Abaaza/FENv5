@@ -1,4 +1,4 @@
-﻿import { Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { getConvexClient } from '../config/convex';
 import { api } from '../lib/convex-api';
 import { ExcelService } from '../services/excel.service';
@@ -20,7 +20,7 @@ const matchingService = MatchingService.getInstance();
 function sanitizeFieldName(name: string): string {
   // Replace non-ASCII and special characters with underscores
   return name.replace(/[^\x20-\x7E]/g, '_') // Non-ASCII characters
-    .replace(/[Â£$â‚¬Â¥Â¢]/g, '_')                // Currency symbols
+    .replace(/[£$€¥¢]/g, '_')                // Currency symbols
     .replace(/\s+/g, '_')                     // Spaces
     .replace(/[^a-zA-Z0-9_]/g, '_')         // Other special characters
     .replace(/_+/g, '_')                      // Multiple underscores
@@ -256,7 +256,7 @@ export async function uploadAndMatch(req: Request, res: Response): Promise<void>
     }
 
     // Console log removed for performance
-    if (!['LOCAL', 'COHERE', 'OPENAI'].includes(matchingMethod)) {
+    if (!['LOCAL', 'V2', 'V1'].includes(matchingMethod)) {
       res.status(400).json({ error: 'Invalid matching method' });
       return;
     }
@@ -1101,8 +1101,8 @@ export async function getMatchingMethods(req: Request, res: Response): Promise<v
     const methods = [
       { value: 'LOCAL', label: 'Local Matching', description: 'Fast fuzzy string matching' },
       { value: 'LOCAL_UNIT', label: 'Local + Unit', description: 'Fuzzy matching with unit awareness' },
-      { value: 'COHERE', label: 'Cohere AI', description: 'AI-powered semantic matching (requires API key)' },
-      { value: 'OPENAI', label: 'OpenAI', description: 'GPT-powered matching (requires API key)' },
+      { value: 'V2', label: 'Cohere AI', description: 'AI-powered semantic matching (requires API key)' },
+      { value: 'V1', label: 'V1', description: 'GPT-powered matching (requires API key)' },
       { value: 'HYBRID', label: 'Hybrid', description: 'Combines all methods for best results' },
       { value: 'HYBRID_CATEGORY', label: 'Hybrid + Category', description: 'Category-aware hybrid matching' },
       { value: 'ADVANCED', label: 'Advanced', description: 'Multi-stage pattern recognition' }
@@ -1251,5 +1251,6 @@ export async function stopAllJobs(req: Request, res: Response): Promise<void> {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to stop all jobs' });
   }
 }
+
 
 

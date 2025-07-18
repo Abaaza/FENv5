@@ -1,4 +1,4 @@
-﻿export interface MatchingThresholds {
+export interface MatchingThresholds {
   minConfidence: {
     local: number;
     cohere: number;
@@ -164,3 +164,4 @@ export function validateConfig(config: Partial<MatchingConfig>): boolean {
   
   return true;
 }
+

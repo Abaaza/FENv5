@@ -10,7 +10,7 @@ applications:
             - cd frontend
             - npm install
             - npm install convex
-            - echo "VITE_CONVEX_URL=https://bright-scorpion-424.convex.cloud" > .env.production
+            - echo "VITE_CONVEX_URL=https://lovely-armadillo-372.convex.cloud" > .env.production
             - echo "VITE_API_URL=https://13.218.146.247/api" >> .env.production
         build:
           commands:

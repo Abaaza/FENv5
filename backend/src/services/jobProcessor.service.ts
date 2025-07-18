@@ -1,4 +1,4 @@
-﻿import { EventEmitter } from 'events';
+import { EventEmitter } from 'events';
 import { getConvexClient } from '../config/convex';
 import { api } from '../lib/convex-api';
 import { MatchingService } from './matching.service';
@@ -463,7 +463,7 @@ export class JobProcessorService extends EventEmitter {
       
       // Emit final progress update before finalizing
       this.emitProgress(job);
-      this.emitLog(jobId, 'success', 'âœ… Job completed successfully!');
+      this.emitLog(jobId, 'success', '✅ Job completed successfully!');
       
       
       // Update Convex with final progress before finalization
@@ -529,7 +529,7 @@ export class JobProcessorService extends EventEmitter {
               description: item.description,
               contextHeaders: item.contextHeaders
             })),
-            job.method.toLowerCase() as 'cohere' | 'openai'
+            job.method.toLowerCase() as 'V2' | 'V1'
           );
           
           this.emitLog(job.jobId, 'success', `Generated embeddings for ${batchEmbeddings.size} items`);
@@ -874,3 +874,4 @@ export class JobProcessorService extends EventEmitter {
 
 // Create singleton instance
 export const jobProcessor = new JobProcessorService();
+

@@ -483,7 +483,7 @@ export class MatchingService {
         const cacheKey = `cohere_${itemText}`;
         let embedding = this.embeddingCache.get(cacheKey);
         
-        if (!embedding && item.embedding && item.embeddingProvider === 'cohere') {
+        if (!embedding && item.embedding && item.embeddingProvider === 'V2') {
           embedding = item.embedding;
           this.embeddingCache.set(cacheKey, embedding);
         }
@@ -589,7 +589,7 @@ export class MatchingService {
 
     // Score items that have embeddings
     const scoredItems = priceItems
-      .filter(item => item.embedding && item.embeddingProvider === 'openai')
+      .filter(item => item.embedding && item.embeddingProvider === 'V1')
       .map(item => {
         const similarity = this.cosineSimilarity(queryEmbedding, item.embedding!);
         
@@ -654,12 +654,12 @@ export class MatchingService {
    */
   async generateBOQEmbeddings(
     items: Array<{ description: string; category?: string; subcategory?: string; unit?: string }>,
-    provider: 'cohere' | 'openai'
+    provider: 'V2' | 'V1'
   ): Promise<Map<string, number[]>> {
     await this.ensureClientsInitialized();
     const embeddings = new Map<string, number[]>();
 
-    if (provider === 'cohere' && this.cohereClient) {
+    if (provider === 'V2' && this.cohereClient) {
       try {
         // Create enhanced texts with category+subcategory emphasis
         const texts = items.map(item => {
@@ -689,7 +689,7 @@ export class MatchingService {
       } catch (error) {
         // Silently fail - embeddings not critical
       }
-    } else if (provider === 'openai' && this.openaiClient) {
+    } else if (provider === 'V1' && this.openaiClient) {
       try {
         // Create enhanced texts with category+subcategory emphasis
         const texts = items.map(item => {
@@ -728,7 +728,7 @@ export class MatchingService {
    */
   async generateBatchEmbeddings(
     descriptions: string[],
-    method: 'COHERE' | 'OPENAI'
+    method: 'V2' | 'V1'
   ): Promise<Map<string, number[]>> {
     await this.ensureClientsInitialized();
     const embeddings = new Map<string, number[]>();
@@ -765,3 +765,5 @@ export class MatchingService {
     return embeddings;
   }
 }
+
+

@@ -25,8 +25,8 @@ export async function getJobPerformanceMetrics(req: Request, res: Response): Pro
     // Get adaptive batch sizing stats for different methods
     const batchStats = {
       LOCAL: AdaptiveBatchSizer.getPerformanceStats(jobId, 'LOCAL'),
-      COHERE: AdaptiveBatchSizer.getPerformanceStats(jobId, 'COHERE'),
-      OPENAI: AdaptiveBatchSizer.getPerformanceStats(jobId, 'OPENAI')
+      COHERE: AdaptiveBatchSizer.getPerformanceStats(jobId, 'V2'),
+      OPENAI: AdaptiveBatchSizer.getPerformanceStats(jobId, 'V1')
     };
 
     // Get current job status
@@ -108,7 +108,7 @@ export async function getSystemMetrics(req: Request, res: Response): Promise<voi
  */
 export async function getMethodComparison(req: Request, res: Response): Promise<void> {
   try {
-    const methods = ['LOCAL', 'COHERE', 'OPENAI', 'HYBRID'];
+    const methods = ['LOCAL', 'V2', 'V1', 'HYBRID'];
     const comparison: any = {};
 
     // This would need to aggregate data from multiple jobs

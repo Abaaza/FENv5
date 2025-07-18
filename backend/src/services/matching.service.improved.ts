@@ -1,4 +1,4 @@
-﻿import FuzzySet from 'fuzzyset';
+import FuzzySet from 'fuzzyset';
 import { CohereClient } from 'cohere-ai';
 import OpenAI from 'openai';
 import { getConvexClient } from '../config/convex';
@@ -36,7 +36,7 @@ export class ImprovedMatchingService {
   private openaiClient: OpenAI | null = null;
   private clientsInitialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
-  private embeddingCache: Map<string, { embedding: number[], provider: 'cohere' | 'openai' }> = new Map();
+  private embeddingCache: Map<string, { embedding: number[], provider: 'V2' | 'V1' }> = new Map();
   
   private config: MatchConfig = {
     minConfidence: 0.5,
@@ -86,11 +86,11 @@ export class ImprovedMatchingService {
     try {
       // Get API keys from application settings
       const settings = await this.convex.query(api.applicationSettings.getByKeys, {
-        keys: ['COHERE_API_KEY', 'OPENAI_API_KEY'],
+        keys: ['V2_API_KEY', 'V1_API_KEY'],
       });
 
-      const cohereKey = settings.find(s => s.key === 'COHERE_API_KEY')?.value;
-      const openaiKey = settings.find(s => s.key === 'OPENAI_API_KEY')?.value;
+      const cohereKey = settings.find(s => s.key === 'V2_API_KEY')?.value;
+      const openaiKey = settings.find(s => s.key === 'V1_API_KEY')?.value;
 
       if (cohereKey) {
         try {
@@ -125,7 +125,7 @@ export class ImprovedMatchingService {
 
   async matchItem(
     description: string,
-    method: 'LOCAL' | 'COHERE' | 'OPENAI' | 'HYBRID' | 'ADVANCED',
+    method: 'LOCAL' | 'V2' | 'V1' | 'HYBRID' | 'ADVANCED',
     priceItems?: PriceItem[],
     contextHeaders?: string[]
   ): Promise<MatchingResult> {
@@ -135,7 +135,7 @@ export class ImprovedMatchingService {
     }
 
     // Ensure AI clients are initialized for methods that need them
-    if (method === 'COHERE' || method === 'OPENAI' || method === 'HYBRID') {
+    if (method === 'V2' || method === 'V1' || method === 'HYBRID') {
       await this.ensureClientsInitialized();
     }
 
@@ -162,10 +162,10 @@ export class ImprovedMatchingService {
       case 'LOCAL':
         result = await this.localMatch(processedDescription, priceItems, contextHeaders);
         break;
-      case 'COHERE':
+      case 'V2':
         result = await this.cohereMatch(processedDescription, priceItems, contextHeaders);
         break;
-      case 'OPENAI':
+      case 'V1':
         result = await this.openaiMatch(processedDescription, priceItems, contextHeaders);
         break;
       case 'HYBRID':
@@ -287,7 +287,7 @@ export class ImprovedMatchingService {
       const queryEmbedding = embeddingResponse.embeddings[0];
 
       // Get embeddings for price items (from cache or generate)
-      const itemsWithEmbeddings = await this.getItemEmbeddings(priceItems, 'cohere');
+      const itemsWithEmbeddings = await this.getItemEmbeddings(priceItems, 'V2');
 
       if (itemsWithEmbeddings.length === 0) {
         logger.warn('No items with embeddings, falling back to local match');
@@ -317,7 +317,7 @@ export class ImprovedMatchingService {
         matchedUnit: bestMatch.unit || '',
         matchedRate: bestMatch.rate,
         confidence: bestSimilarity,
-        method: 'COHERE'
+        method: 'V2'
       };
     } catch (error) {
       logger.error('Cohere match failed, falling back to local', { error });
@@ -354,7 +354,7 @@ export class ImprovedMatchingService {
       const queryEmbedding = embeddingResponse.data[0].embedding;
 
       // Get embeddings for price items (from cache or generate)
-      const itemsWithEmbeddings = await this.getItemEmbeddings(priceItems, 'openai');
+      const itemsWithEmbeddings = await this.getItemEmbeddings(priceItems, 'V1');
 
       if (itemsWithEmbeddings.length === 0) {
         logger.warn('No items with embeddings, falling back to local match');
@@ -384,7 +384,7 @@ export class ImprovedMatchingService {
         matchedUnit: bestMatch.unit || '',
         matchedRate: bestMatch.rate,
         confidence: bestSimilarity,
-        method: 'OPENAI' // Fixed: was returning 'COHERE'
+        method: 'V1' // Fixed: was returning 'V2'
       };
     } catch (error) {
       logger.error('OpenAI match failed, falling back to local', { error });
@@ -402,8 +402,8 @@ export class ImprovedMatchingService {
     // Try all methods and collect results
     const methods = [
       { name: 'LOCAL', weight: 0.7, fn: () => this.localMatch(description, priceItems, contextHeaders) },
-      { name: 'COHERE', weight: 1.0, fn: () => this.cohereMatch(description, priceItems, contextHeaders) },
-      { name: 'OPENAI', weight: 1.0, fn: () => this.openaiMatch(description, priceItems, contextHeaders) }
+      { name: 'V2', weight: 1.0, fn: () => this.cohereMatch(description, priceItems, contextHeaders) },
+      { name: 'V1', weight: 1.0, fn: () => this.openaiMatch(description, priceItems, contextHeaders) }
     ];
 
     // Execute all methods in parallel
@@ -509,7 +509,7 @@ export class ImprovedMatchingService {
 
   private async getItemEmbeddings(
     items: PriceItem[], 
-    provider: 'cohere' | 'openai'
+    provider: 'V2' | 'V1'
   ): Promise<PriceItem[]> {
     const itemsWithEmbeddings: PriceItem[] = [];
     const itemsNeedingEmbeddings: PriceItem[] = [];
@@ -542,7 +542,7 @@ export class ImprovedMatchingService {
       logger.info(`Generating ${provider} embeddings for ${itemsNeedingEmbeddings.length} items`);
       
       // Batch generate embeddings
-      const batchSize = provider === 'cohere' ? 96 : 100;
+      const batchSize = provider === 'V2' ? 96 : 100;
       
       for (let i = 0; i < itemsNeedingEmbeddings.length; i += batchSize) {
         const batch = itemsNeedingEmbeddings.slice(i, i + batchSize);
@@ -571,12 +571,12 @@ export class ImprovedMatchingService {
 
   private async generateBatchEmbeddings(
     items: PriceItem[], 
-    provider: 'cohere' | 'openai'
+    provider: 'V2' | 'V1'
   ): Promise<number[][]> {
     const texts = items.map(item => item.description);
 
     try {
-      if (provider === 'cohere' && this.cohereClient) {
+      if (provider === 'V2' && this.cohereClient) {
         const response = await this.cohereClient.embed({
           texts,
           model: 'embed-english-v3.0',
@@ -587,7 +587,7 @@ export class ImprovedMatchingService {
           ? response.embeddings 
           : (response.embeddings as any).float || (response.embeddings as any).int8 || (response.embeddings as any).uint8 || (response.embeddings as any).ubinary || (response.embeddings as any).binary || [];
         return embeddings;
-      } else if (provider === 'openai' && this.openaiClient) {
+      } else if (provider === 'V1' && this.openaiClient) {
         const response = await this.openaiClient.embeddings.create({
           input: texts,
           model: 'text-embedding-3-large',
@@ -660,3 +660,5 @@ export class ImprovedMatchingService {
 
 // Export singleton instance
 export const improvedMatchingService = ImprovedMatchingService.getInstance();
+
+

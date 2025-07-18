@@ -1,4 +1,4 @@
-﻿// Enhanced matching logic to treat category + subcategory as a combined unit
+// Enhanced matching logic to treat category + subcategory as a combined unit
 
 // Note: This file contains code snippets for improving the matching logic.
 // These are examples to be integrated into your existing matching service.
@@ -182,3 +182,4 @@ function extractCategoryFromDescription(description: string): { category?: strin
 // Export the helper functions for use in other modules
 export { createEnrichedText, extractCategoryFromDescription };
 export type { PriceItem };
+

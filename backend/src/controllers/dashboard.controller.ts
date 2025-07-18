@@ -1,4 +1,4 @@
-﻿import { Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { getConvexClient } from '../config/convex';
 import { api } from '../lib/convex-api';
 import { toConvexId } from '../utils/convexId';
@@ -92,7 +92,7 @@ export async function getSystemHealth(req: Request, res: Response): Promise<void
     // Check Cohere API
     try {
       const cohereKey = await convex.query(api.applicationSettings.getByKey, { 
-        key: 'COHERE_API_KEY' 
+        key: 'V2_API_KEY' 
       }) as { value?: string } | null;
       console.log('[Dashboard] Cohere key from DB:', cohereKey ? 'Found' : 'Not found', cohereKey ? `(length: ${cohereKey.value?.length})` : '');
       if (cohereKey?.value) {
@@ -123,7 +123,7 @@ export async function getSystemHealth(req: Request, res: Response): Promise<void
     // Check OpenAI API
     try {
       const openaiKey = await convex.query(api.applicationSettings.getByKey, { 
-        key: 'OPENAI_API_KEY' 
+        key: 'V1_API_KEY' 
       }) as { value?: string } | null;
       console.log('[Dashboard] OpenAI key from DB:', openaiKey ? 'Found' : 'Not found', openaiKey ? `(length: ${openaiKey.value?.length})` : '');
       if (openaiKey?.value) {
@@ -273,4 +273,5 @@ export async function getActivityStats(req: Request, res: Response): Promise<voi
     res.status(500).json({ error: 'Failed to get activity stats' });
   }
 }
+
 

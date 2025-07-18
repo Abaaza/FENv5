@@ -1,4 +1,4 @@
-﻿import { getConvexClient } from '../config/convex';
+import { getConvexClient } from '../config/convex';
 import { api } from '../lib/convex-api';
 import { PriceItem } from '../types/priceItem.types';
 import { CohereClient } from 'cohere-ai';
@@ -13,7 +13,7 @@ import { ConstructionPatternsService } from './constructionPatterns.service';
 
 interface EmbeddingCacheEntry {
   embedding: number[];
-  provider: 'cohere' | 'openai';
+  provider: 'V2' | 'V1';
 }
 
 interface MatchingResult {
@@ -73,8 +73,8 @@ export class MatchingService {
         }
       );
       
-      const cohereKey = settings.find(s => s.key === 'COHERE_API_KEY')?.value;
-      const openaiKey = settings.find(s => s.key === 'OPENAI_API_KEY')?.value;
+      const cohereKey = settings.find(s => s.key === 'V2_API_KEY')?.value;
+      const openaiKey = settings.find(s => s.key === 'V1_API_KEY')?.value;
       
       if (cohereKey && !this.cohereClient) {
         this.cohereClient = new CohereClient({ token: cohereKey });
@@ -165,7 +165,7 @@ export class MatchingService {
    */
   async matchItemWithEmbedding(
     description: string,
-    method: 'COHERE' | 'OPENAI',
+    method: 'V2' | 'V1',
     preGeneratedEmbedding: number[],
     providedPriceItems?: PriceItem[],
     contextHeaders?: string[]
@@ -232,7 +232,7 @@ export class MatchingService {
    */
   async matchItem(
     description: string,
-    method: 'LOCAL' | 'COHERE' | 'OPENAI',
+    method: 'LOCAL' | 'V2' | 'V1',
     providedPriceItems?: PriceItem[],
     contextHeaders?: string[]
   ): Promise<MatchingResult> {
@@ -245,7 +245,7 @@ export class MatchingService {
     console.log(`[MatchingService] Context: ${contextHeaders?.join(' > ') || 'None'}`);
     
     // Ensure AI clients are initialized for methods that need them
-    if (['COHERE', 'OPENAI'].includes(method)) {
+    if (['V2', 'V1'].includes(method)) {
       await this.ensureClientsInitialized();
     }
 
@@ -264,10 +264,10 @@ export class MatchingService {
         case 'LOCAL':
           result = await this.localMatch(processedDescription, priceItems, contextHeaders);
           break;
-        case 'COHERE':
+        case 'V2':
           result = await this.cohereMatch(processedDescription, priceItems, contextHeaders);
           break;
-        case 'OPENAI':
+        case 'V1':
           result = await this.openAIMatch(processedDescription, priceItems, contextHeaders);
           break;
         default:
@@ -479,7 +479,7 @@ export class MatchingService {
         scores: bestMatch.breakdown,
         factors: Object.keys(bestMatch.breakdown).filter(k => bestMatch.breakdown[k] > 0),
         reasoning: `Composite match: ${bestMatch.breakdown.fuzzy.toFixed(0)}% description, ` +
-                   `${bestMatch.breakdown.unit}pts unit${queryUnit && bestMatch.item.unit ? ` (${queryUnit} → ${bestMatch.item.unit})` : ''}, ` +
+                   `${bestMatch.breakdown.unit}pts unit${queryUnit && bestMatch.item.unit ? ` (${queryUnit} ? ${bestMatch.item.unit})` : ''}, ` +
                    `${bestMatch.breakdown.category}pts category${bestMatch.item.subcategory ? '+subcategory' : ''}, ` +
                    `${bestMatch.breakdown.keywords}pts keywords`
       }
@@ -495,15 +495,15 @@ export class MatchingService {
    * COHERE MATCH - Semantic matching with Cohere embeddings
    */
   private async cohereMatch(description: string, priceItems: PriceItem[], contextHeaders?: string[]): Promise<MatchingResult> {
-    const timer = debugLog.startTimer('COHERE', 'Semantic matching');
-    debugLog.log('COHERE', `Matching "${description}" against ${priceItems.length} price items`);
+    const timer = debugLog.startTimer('V2', 'Semantic matching');
+    debugLog.log('V2', `Matching "${description}" against ${priceItems.length} price items`);
     console.log(`[MatchingService/COHERE] Starting Cohere match for: "${description}"`);
     console.log(`[MatchingService/COHERE] Price items available: ${priceItems.length}`);
     console.log(`[MatchingService/COHERE] Context headers: ${contextHeaders?.join(' > ') || 'None'}`);
     
     if (!this.cohereClient) {
-      const error = 'Cohere client not initialized. Please configure COHERE_API_KEY.';
-      debugLog.error('COHERE', error);
+      const error = 'Cohere client not initialized. Please configure V2_API_KEY.';
+      debugLog.error('V2', error);
       console.error(`[MatchingService/COHERE] ${error}`);
       throw new Error(error);
     }
@@ -534,7 +534,7 @@ export class MatchingService {
         enrichedQuery += ` Grade: ${queryFeatures.grade}.`;
       }
       
-      debugLog.log('COHERE', `Enriched query with context and construction features`, { enrichedQuery });
+      debugLog.log('V2', `Enriched query with context and construction features`, { enrichedQuery });
     } else {
       enrichedQuery = expandedDescription;
     }
@@ -545,7 +545,7 @@ export class MatchingService {
     // Get query embedding
     let queryEmbedding: number[];
     try {
-      debugLog.log('COHERE', 'Generating query embedding...');
+      debugLog.log('V2', 'Generating query embedding...');
       const response = await withRetry(
         () => this.cohereClient!.embed({
           texts: [enrichedQuery],
@@ -558,7 +558,7 @@ export class MatchingService {
           delayMs: 3000,
           timeout: 30000,
           onRetry: (error, attempt) => {
-            debugLog.warning('COHERE', `Embedding generation retry ${attempt}`, { error: error.message });
+            debugLog.warning('V2', `Embedding generation retry ${attempt}`, { error: error.message });
           }
         }
       );
@@ -575,7 +575,7 @@ export class MatchingService {
       }
     } catch (error) {
       console.error('[MatchingService/COHERE] Failed to generate query embedding:', error);
-      debugLog.error('COHERE', 'Failed to generate embedding, falling back to LOCAL', error);
+      debugLog.error('V2', 'Failed to generate embedding, falling back to LOCAL', error);
       // Fallback to LOCAL
       return this.localMatch(description, priceItems, contextHeaders);
     }
@@ -584,18 +584,18 @@ export class MatchingService {
     const itemsWithEmbeddings = priceItems.filter(item => {
       const enrichedText = this.createEnrichedText(item);
       const cached = this.embeddingCache.get(enrichedText);
-      return (cached && cached.provider === 'cohere') || 
-             (item.embedding && item.embeddingProvider === 'cohere');
+      return (cached && cached.provider === 'V2') || 
+             (item.embedding && item.embeddingProvider === 'V2');
     });
 
     if (itemsWithEmbeddings.length === 0) {
       console.warn('[MatchingService/COHERE] No items with embeddings. Falling back to LOCAL.');
-      debugLog.warning('COHERE', `No price items have embeddings. Total items: ${priceItems.length}`);
+      debugLog.warning('V2', `No price items have embeddings. Total items: ${priceItems.length}`);
       return this.localMatch(description, priceItems, contextHeaders);
     }
     
     console.log(`[MatchingService/COHERE] Comparing against ${itemsWithEmbeddings.length} items with embeddings`);
-    debugLog.log('COHERE', `Found ${itemsWithEmbeddings.length} items with Cohere embeddings`);
+    debugLog.log('V2', `Found ${itemsWithEmbeddings.length} items with Cohere embeddings`);
 
     // Calculate similarities
     const scoredMatches: Array<{item: PriceItem, similarity: number}> = [];
@@ -718,7 +718,7 @@ export class MatchingService {
       matchedUnit: bestMatch.item.unit || '',
       matchedRate: bestMatch.item.rate,
       confidence: Math.min(finalConfidence * 1.1, 0.99), // 10% boost
-      method: 'COHERE',
+      method: 'V2',
       matchingDetails: {
         scores: { similarity: bestMatch.similarity, adjusted: finalConfidence },
         factors: ['semantic', 'unit', 'context'],
@@ -734,7 +734,7 @@ export class MatchingService {
     console.log(`[MatchingService/OPENAI] Semantic matching with OpenAI`);
     
     if (!this.openaiClient) {
-      throw new Error('OpenAI client not initialized. Please configure OPENAI_API_KEY.');
+      throw new Error('OpenAI client not initialized. Please configure V1_API_KEY.');
     }
 
     // Build enriched query with full context and construction patterns
@@ -797,8 +797,8 @@ export class MatchingService {
     const itemsWithEmbeddings = priceItems.filter(item => {
       const enrichedText = this.createEnrichedText(item);
       const cached = this.embeddingCache.get(enrichedText);
-      return (cached && cached.provider === 'openai') || 
-             (item.embedding && item.embeddingProvider === 'openai');
+      return (cached && cached.provider === 'V1') || 
+             (item.embedding && item.embeddingProvider === 'V1');
     });
 
     if (itemsWithEmbeddings.length === 0) {
@@ -929,7 +929,7 @@ export class MatchingService {
       matchedUnit: bestMatch.item.unit || '',
       matchedRate: bestMatch.item.rate,
       confidence: Math.min(finalConfidence * 1.1, 0.99), // 10% boost
-      method: 'OPENAI',
+      method: 'V1',
       matchingDetails: {
         scores: { similarity: bestMatch.similarity, adjusted: finalConfidence },
         factors: ['semantic', 'unit', 'context'],
@@ -944,12 +944,12 @@ export class MatchingService {
    */
   async generateBOQEmbeddings(
     items: Array<{ description: string; contextHeaders?: string[] }>,
-    provider: 'cohere' | 'openai'
+    provider: 'V2' | 'V1'
   ): Promise<Map<string, number[]>> {
     await this.ensureClientsInitialized();
     
     const embeddings = new Map<string, number[]>();
-    const batchSize = provider === 'cohere' ? 96 : 2048; // Maximum supported batch sizes
+    const batchSize = provider === 'V2' ? 96 : 2048; // Maximum supported batch sizes
     
     console.log(`[MatchingService] Generating ${provider} embeddings for ${items.length} BOQ items in batches of ${batchSize}`);
     
@@ -957,7 +957,7 @@ export class MatchingService {
       const batch = items.slice(i, i + batchSize);
       
       try {
-        if (provider === 'cohere' && this.cohereClient) {
+        if (provider === 'V2' && this.cohereClient) {
           const texts = batch.map(item => {
             let enrichedQuery = item.description;
             if (item.contextHeaders && item.contextHeaders.length > 0) {
@@ -990,7 +990,7 @@ export class MatchingService {
               embeddings.set(item.description, responseEmbeddings[idx]);
             }
           });
-        } else if (provider === 'openai' && this.openaiClient) {
+        } else if (provider === 'V1' && this.openaiClient) {
           const texts = batch.map(item => {
             let enrichedQuery = item.description;
             if (item.contextHeaders && item.contextHeaders.length > 0) {
@@ -1023,7 +1023,7 @@ export class MatchingService {
         
         // Rate limiting between batches
         if (i + batchSize < items.length) {
-          await new Promise(resolve => setTimeout(resolve, provider === 'cohere' ? 2000 : 1000));
+          await new Promise(resolve => setTimeout(resolve, provider === 'V2' ? 2000 : 1000));
         }
       } catch (error) {
         console.error(`[MatchingService] Failed to generate embeddings for batch:`, error);
@@ -1037,8 +1037,8 @@ export class MatchingService {
   /**
    * Generate embeddings for price items in batches
    */
-  async generateBatchEmbeddings(priceItems: PriceItem[], provider: 'cohere' | 'openai') {
-    const batchSize = provider === 'cohere' ? 96 : 2048; // Maximum supported batch sizes
+  async generateBatchEmbeddings(priceItems: PriceItem[], provider: 'V2' | 'V1') {
+    const batchSize = provider === 'V2' ? 96 : 2048; // Maximum supported batch sizes
     const batches: PriceItem[][] = [];
     
     for (let i = 0; i < priceItems.length; i += batchSize) {
@@ -1054,7 +1054,7 @@ export class MatchingService {
       try {
         console.log(`[MatchingService] Processing batch ${i + 1}/${batches.length} (${batch.length} items)`);
         
-        if (provider === 'cohere' && this.cohereClient) {
+        if (provider === 'V2' && this.cohereClient) {
           const response = await withRetry(
             () => this.cohereClient!.embed({
               texts,
@@ -1079,11 +1079,11 @@ export class MatchingService {
               const enrichedText = this.createEnrichedText(item);
               this.embeddingCache.set(enrichedText, {
                 embedding: embeddings[index],
-                provider: 'cohere'
+                provider: 'V2'
               });
             }
           });
-        } else if (provider === 'openai' && this.openaiClient) {
+        } else if (provider === 'V1' && this.openaiClient) {
           const response = await withRetry(
             () => this.openaiClient!.embeddings.create({
               model: 'text-embedding-3-large',
@@ -1102,7 +1102,7 @@ export class MatchingService {
               const enrichedText = this.createEnrichedText(item);
               this.embeddingCache.set(enrichedText, {
                 embedding: response.data[index].embedding,
-                provider: 'openai'
+                provider: 'V1'
               });
             }
           });
@@ -1110,7 +1110,7 @@ export class MatchingService {
         
         // Delay between batches
         if (i < batches.length - 1) {
-          const delay = provider === 'cohere' ? 2000 : 1000;
+          const delay = provider === 'V2' ? 2000 : 1000;
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       } catch (error: any) {
@@ -1180,7 +1180,7 @@ export class MatchingService {
       /\b(SQUARE\s*METER|SQUARE\s*METRE|CUBIC\s*METER|CUBIC\s*METRE)\b/i,
       /\b(SQUARE\s*FEET|SQUARE\s*FOOT|CUBIC\s*FEET|CUBIC\s*FOOT)\b/i,
       /\b(RUNNING\s*METER|RUNNING\s*METRE|RUNNING\s*FEET|RUNNING\s*FOOT)\b/i,
-      /(\d+(?:'|ft|foot|feet))\s*[xXÃ—]\s*(\d+(?:'|ft|foot|feet))/i // Dimension patterns
+      /(\d+(?:'|ft|foot|feet))\s*[xX×]\s*(\d+(?:'|ft|foot|feet))/i // Dimension patterns
     ];
     
     for (const pattern of unitPatterns) {
@@ -1222,8 +1222,8 @@ export class MatchingService {
     // Normalize common construction abbreviations
     const replacements = new Map([
       // Dimensions
-      [/(\d+)\s*['"'"]\s*[xXÃ—]\s*(\d+)\s*['"'"]?/g, '$1 x $2'], // 10' x 20' -> 10 x 20
-      [/(\d+)\s*mm\s*[xXÃ—]\s*(\d+)\s*mm/gi, '$1mm x $2mm'],
+      [/(\d+)\s*['"'"]\s*[xX×]\s*(\d+)\s*['"'"]?/g, '$1 x $2'], // 10' x 20' -> 10 x 20
+      [/(\d+)\s*mm\s*[xX×]\s*(\d+)\s*mm/gi, '$1mm x $2mm'],
       [/\b(\d+)\s*['"'"]/g, '$1 feet'], // 10' -> 10 feet
       
       // Common typos and variations
@@ -1440,7 +1440,7 @@ export class MatchingService {
    */
   async getTopMatches(
     description: string, 
-    method: 'LOCAL' | 'COHERE' | 'OPENAI',
+    method: 'LOCAL' | 'V2' | 'V1',
     providedPriceItems?: PriceItem[], 
     limit: number = 3,
     contextHeaders?: string[]
@@ -1571,3 +1571,5 @@ export class MatchingService {
     console.log('[MatchingService] All caches cleared');
   }
 }
+
+
