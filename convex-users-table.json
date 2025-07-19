@@ -1,0 +1,35 @@
+{
+  "tableName": "users",
+  "schema": {
+    "email": "string",
+    "password": "string",
+    "name": "string",
+    "role": "union('user' | 'admin')",
+    "isApproved": "boolean",
+    "isActive": "optional(boolean)",
+    "createdAt": "number",
+    "lastLogin": "optional(number)",
+    "refreshToken": "optional(string)"
+  },
+  "indexes": [
+    {
+      "name": "by_email",
+      "fields": ["email"]
+    },
+    {
+      "name": "by_refresh_token", 
+      "fields": ["refreshToken"]
+    }
+  ],
+  "adminUser": {
+    "email": "abaza@tfp.com",
+    "password": "$2a$10$mLVQJwUcHZUtlKjz0ua8PO83naQM3v0Gb2YJHvLZWni0cVU9I5/Ii",
+    "name": "Admin User",
+    "role": "admin",
+    "isApproved": true,
+    "isActive": true,
+    "createdAt": 1737234000000,
+    "lastLogin": null,
+    "refreshToken": null
+  }
+}

@@ -1,0 +1,23 @@
+﻿id,code,description,unit,rate,category,subcategory,material_type,material_size,brand,supplier,remark,isActive
+FENCE_0001,BT-B-R,2000mm high (above ground) post and concrete panel over retaining wall,lin.m,30.0,Fencing,Posts,Concrete,2000mm,,The Fencing People,,TRUE
+FENCE_0002,BT-A-R,2000mm high (above ground) concrete post and 1100mm high concrete panel fence and 900mm timber hit and miss fencing both sides over retaining wall,lin.m,45.0,Fencing,Posts,Concrete,2000mm,,The Fencing People,,TRUE
+FENCE_0003,BT-A,"2000mm high (above ground) concrete post, 1100m high concrete panel & 900mm high timber hit and mess fence both sides",lin.m,45.0,Fencing,Posts,Concrete,2000mm,,The Fencing People,,TRUE
+FENCE_0004,BT-B,2000mm high (above ground) concrete post & concrete panel fence,lin.m,45.0,Fencing,Posts,Concrete,2000mm,,The Fencing People,,TRUE
+FENCE_0005,BT-H,1000mm high (above ground) concrete post & 3 no. galvanised wire fence,lin.m,45.0,Fencing,Posts,Concrete,1000mm,,The Fencing People,,TRUE
+FENCE_0006,BT-F1,1800mm high (above ground) polyester powder coated galvanissed mild steel mesh fencing on RHS ppc posts,lin.m,30.0,Fencing,Posts,Steel,1800mm,,The Fencing People,,TRUE
+FENCE_0007,BT-F2,1200mm high (above ground) polyester powder coated galvanissed mild steel mesh fencing on RHS ppc posts,lin.m,30.0,Fencing,Posts,Steel,1200mm,,The Fencing People,,TRUE
+FENCE_0008,G1,Galvanized steel gates. 50mmx10mm flat bar frame with 50mm x 10mm dia uprights at min 80mm and max 95mm centers as per drawing T-006,nr,250.0,Fencing,Gates,Steel,,,The Fencing People,,TRUE
+FENCE_0009,G2,2100mm Double sided wooden boarded fencing (vertical) - posts 125x125x2600mm pressure treated timber as per drawing T-007,nr,35.0,Fencing,Posts,Timber,,,The Fencing People,,TRUE
+FENCE_0010,G3,SHS Gate 60x60x3 as per drawing T-007,nr,250.0,Fencing,Gates,,,,The Fencing People,,TRUE
+FENCE_0011,STD-011,Chain Link Fence 1.8m High (Green PVC Coated),LM,28.5,Fencing,Chain Link,,,,The Fencing People,Standard Item,TRUE
+FENCE_0012,STD-012,Chain Link Fence 2.4m High (Green PVC Coated),LM,35.0,Fencing,Chain Link,,,,The Fencing People,Standard Item,TRUE
+FENCE_0013,STD-013,Timber Post 100x100x2400mm Treated,EA,25.0,Fencing,Posts,,,,The Fencing People,Standard Item,TRUE
+FENCE_0014,STD-014,Concrete Post 125x125x2400mm,EA,45.0,Fencing,Posts,,,,The Fencing People,Standard Item,TRUE
+FENCE_0015,STD-015,Palisade Fencing 1.8m High (Galvanized),LM,65.0,Fencing,Palisade,,,,The Fencing People,Standard Item,TRUE
+FENCE_0016,STD-016,Palisade Fencing 2.4m High (Galvanized),LM,85.0,Fencing,Palisade,,,,The Fencing People,Standard Item,TRUE
+FENCE_0017,STD-017,Double Leaf Gate 3m x 1.8m (Galvanized),EA,450.0,Fencing,Gates,,,,The Fencing People,Standard Item,TRUE
+FENCE_0018,STD-018,Single Leaf Gate 1m x 1.8m (Galvanized),EA,250.0,Fencing,Gates,,,,The Fencing People,Standard Item,TRUE
+FENCE_0019,STD-019,Barbed Wire 2 Strand on Extension Arms,LM,8.5,Fencing,Security,,,,The Fencing People,Standard Item,TRUE
+FENCE_0020,STD-020,Anti-Climb Paint (5L),EA,35.0,Fencing,Security,,,,The Fencing People,Standard Item,TRUE
+FENCE_0021,STD-021,Concrete for Post Foundation,M3,120.0,Fencing,Foundations,,,,The Fencing People,Standard Item,TRUE
+FENCE_0022,STD-022,Post Hole Excavation and Backfill,EA,25.0,Fencing,Installation,,,,The Fencing People,Standard Item,TRUE

@@ -1,0 +1,8 @@
+{
+  "email": "abaza@tfp.com",
+  "password": "$2a$10$mLVQJwUcHZUtlKjz0ua8PO83naQM3v0Gb2YJHvLZWni0cVU9I5/Ii",
+  "name": "Admin User",
+  "role": "admin",
+  "isActive": true,
+  "isApproved": true
+}
