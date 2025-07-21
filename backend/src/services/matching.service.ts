@@ -342,6 +342,14 @@ export class MatchingService {
     const targetCategory = contextHeaders?.[0]?.toLowerCase() || '';
     const targetSubcategory = contextHeaders?.[1]?.toLowerCase() || '';
     
+    console.log('[localMatch] Starting local match:', {
+      description: description.substring(0, 50) + '...',
+      queryUnit,
+      targetCategory,
+      targetSubcategory,
+      priceItemsCount: priceItems.length
+    });
+    
     const matches = priceItems.map(item => {
       // Simple fuzzy score
       // Calculate fuzzy score
@@ -413,6 +421,12 @@ export class MatchingService {
       return b.score - a.score;
     });
     const bestMatch = matches[0];
+    
+    // Log top 3 matches for debugging
+    console.log('[localMatch] Top 3 matches:');
+    matches.slice(0, 3).forEach((match, index) => {
+      console.log(`  ${index + 1}. Score: ${match.score.toFixed(2)}, Desc: ${match.item.description.substring(0, 50)}..., Unit: ${match.item.unit || 'N/A'}`);
+    });
     
     // Always return the best match, even if confidence is low
     // Let the user decide what confidence threshold to accept

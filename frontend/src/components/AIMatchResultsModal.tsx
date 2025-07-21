@@ -220,9 +220,10 @@ export function AIMatchResultsModal({ jobId, jobMatchingMethod, onClose }: AIMat
 
   // Local test mutation
   const runLocalTestMutation = useMutation({
-    mutationFn: async ({ resultId, description }: { resultId: string; description: string }) => {
+    mutationFn: async ({ resultId, description, contextHeaders }: { resultId: string; description: string; contextHeaders?: string[] }) => {
       const response = await api.post(`/price-matching/test/local`, {
         description,
+        contextHeaders,
       });
       return { ...response.data, resultId };
     },
@@ -383,7 +384,8 @@ export function AIMatchResultsModal({ jobId, jobMatchingMethod, onClose }: AIMat
     setRunningLocalTests(prev => ({ ...prev, [result._id]: true }));
     runLocalTestMutation.mutate({
       resultId: result._id,
-      description: result.originalDescription
+      description: result.originalDescription,
+      contextHeaders: result.contextHeaders
     });
   };
 

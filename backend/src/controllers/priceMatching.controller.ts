@@ -1117,7 +1117,7 @@ export async function getMatchingMethods(req: Request, res: Response): Promise<v
 export async function testLocalMatch(req: Request, res: Response): Promise<void> {
   // Console log removed for performance
   try {
-    const { description } = req.body;
+    const { description, contextHeaders } = req.body;
 
     if (!req.user) {
       res.status(401).json({ error: 'Not authenticated' });
@@ -1143,14 +1143,22 @@ export async function testLocalMatch(req: Request, res: Response): Promise<void>
     }
 
     // Run local match test
-    // Console log removed for performance
+    console.log('[testLocalMatch] Running local match with:', {
+      description,
+      contextHeaders,
+      priceItemCount: priceItems.length
+    });
     const matchResult = await matchingService.matchItem(
       description,
       'LOCAL',
       priceItems,
-      [] // No context headers for instant test
+      contextHeaders || [] // Use provided context headers or empty array
     );
-    // Console log removed for performance
+    console.log('[testLocalMatch] Match result:', {
+      matchedDescription: matchResult.matchedDescription,
+      confidence: matchResult.confidence,
+      matchedRate: matchResult.matchedRate
+    });
 
     // For now, return just the best match as an array
     const matches = [{
