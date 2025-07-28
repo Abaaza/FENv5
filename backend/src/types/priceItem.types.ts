@@ -1,9 +1,15 @@
 export interface PriceItem {
   _id: string;
   id: string;
+  // New schema fields
+  name?: string;
+  product_template_variant_value_ids?: string;
+  operation_cost?: number;
+  uom_id?: string;
+  // Old schema fields
   code?: string;
   ref?: string;
-  description: string;
+  description?: string;
   keywords?: string[];
   // Construction-specific fields
   material_type?: string;
@@ -15,7 +21,7 @@ export interface PriceItem {
   work_type?: string;
   brand?: string;
   unit?: string;
-  rate: number;
+  rate?: number;
   labor_rate?: number;
   material_rate?: number;
   wastage_percentage?: number;

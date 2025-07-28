@@ -111,8 +111,9 @@ export class MatchingService {
       parts.push(item.subcategory);
     }
     
-    if (item.unit) {
-      parts.push(item.unit);
+    const unit = item.unit || item.uom_id;
+    if (unit) {
+      parts.push(unit);
     }
     
     return parts.join(' ');
@@ -293,14 +294,15 @@ export class MatchingService {
       
       // Strong unit boost for AI matching
       let finalScore = similarity;
-      if (queryUnit && item.unit) {
+      const itemUnit = item.unit || item.uom_id;
+      if (queryUnit && itemUnit) {
         const normalizedQuery = this.normalizeUnit(queryUnit);
-        const normalizedItem = this.normalizeUnit(item.unit);
+        const normalizedItem = this.normalizeUnit(itemUnit);
         if (normalizedQuery === normalizedItem) {
           // Boost score significantly for unit match
           finalScore = Math.min(similarity + 0.3, 0.99); // Add 30% boost instead of 20% multiply
         }
-      } else if (queryUnit && !item.unit) {
+      } else if (queryUnit && !(item.unit || item.uom_id)) {
         // Penalize items without units
         finalScore = similarity * 0.7; // 30% penalty
       }
@@ -314,10 +316,10 @@ export class MatchingService {
     
     return {
       matchedItemId: bestMatch.item._id,
-      matchedDescription: bestMatch.item.description,
-      matchedCode: bestMatch.item.code || '',
-      matchedUnit: bestMatch.item.unit || '',
-      matchedRate: bestMatch.item.rate,
+      matchedDescription: bestMatch.item.description || bestMatch.item.name || '',
+      matchedCode: bestMatch.item.code || bestMatch.item.id || '',
+      matchedUnit: bestMatch.item.unit || bestMatch.item.uom_id || '',
+      matchedRate: bestMatch.item.rate || bestMatch.item.operation_cost || 0,
       confidence: bestMatch.score,
       method: method
     };
@@ -374,20 +376,22 @@ export class MatchingService {
     const matches = priceItems.map(item => {
       // Simple fuzzy score
       // Calculate fuzzy score
-      const fuzzyScore = fuzz.token_set_ratio(description, item.description); // Use full score
+      const itemDescription = item.description || item.name || '';
+      const fuzzyScore = fuzz.token_set_ratio(description, itemDescription); // Use full score
       
       // Unit bonus - HEAVILY PRIORITIZED
       let unitBonus = 0;
-      if (queryUnit && item.unit) {
+      const itemUnit = item.unit || item.uom_id;
+      if (queryUnit && itemUnit) {
         const normalizedQuery = this.normalizeUnit(queryUnit);
-        const normalizedItem = this.normalizeUnit(item.unit);
+        const normalizedItem = this.normalizeUnit(itemUnit);
         if (normalizedQuery === normalizedItem) {
           unitBonus = 40; // Reduced from 50 to 40
         }
-      } else if (queryUnit && !item.unit) {
+      } else if (queryUnit && !itemUnit) {
         // Penalize items without units when query has a unit
         unitBonus = -20; // Increased penalty
-      } else if (!queryUnit && item.unit) {
+      } else if (!queryUnit && itemUnit) {
         // Slight penalty when query has no unit but item has one
         unitBonus = -5;
       }
@@ -428,8 +432,8 @@ export class MatchingService {
     matches.sort((a, b) => {
       // If scores are very close (within 10 points), prioritize unit match
       if (Math.abs(b.score - a.score) < 10 && queryUnit) {
-        const aNormUnit = a.item.unit ? this.normalizeUnit(a.item.unit) : '';
-        const bNormUnit = b.item.unit ? this.normalizeUnit(b.item.unit) : '';
+        const aNormUnit = (a.item.unit || a.item.uom_id) ? this.normalizeUnit(a.item.unit || a.item.uom_id) : '';
+        const bNormUnit = (b.item.unit || b.item.uom_id) ? this.normalizeUnit(b.item.unit || b.item.uom_id) : '';
         const queryNormUnit = this.normalizeUnit(queryUnit);
         
         const aHasUnitMatch = aNormUnit === queryNormUnit;
@@ -446,17 +450,17 @@ export class MatchingService {
     // Log top 3 matches for debugging
     console.log('[localMatch] Top 3 matches:');
     matches.slice(0, 3).forEach((match, index) => {
-      console.log(`  ${index + 1}. Score: ${match.score.toFixed(2)}, Desc: ${match.item.description.substring(0, 50)}..., Unit: ${match.item.unit || 'N/A'}`);
+      console.log(`  ${index + 1}. Score: ${match.score.toFixed(2)}, Desc: ${(match.item.description || match.item.name || '').substring(0, 50)}..., Unit: ${match.item.unit || match.item.uom_id || 'N/A'}`);
     });
     
     // Always return the best match, even if confidence is low
     // Let the user decide what confidence threshold to accept
     return {
       matchedItemId: bestMatch.item._id,
-      matchedDescription: bestMatch.item.description,
-      matchedCode: bestMatch.item.code || '',
-      matchedUnit: bestMatch.item.unit || '',
-      matchedRate: bestMatch.item.rate,
+      matchedDescription: bestMatch.item.description || bestMatch.item.name || '',
+      matchedCode: bestMatch.item.code || bestMatch.item.id || '',
+      matchedUnit: bestMatch.item.unit || bestMatch.item.uom_id || '',
+      matchedRate: bestMatch.item.rate || bestMatch.item.operation_cost || 0,
       // Adjust confidence calculation to account for bonuses
       // Max possible: fuzzy(90) + unit(40) + category(25) = 155
       // Scale confidence more generously to avoid too many low scores
@@ -556,7 +560,7 @@ export class MatchingService {
             // Boost score significantly for unit match
             finalScore = Math.min(similarity + 0.3, 0.99); // Add 30% boost
           }
-        } else if (queryUnit && !item.unit) {
+        } else if (queryUnit && !(item.unit || item.uom_id)) {
           // Penalize items without units
           finalScore = similarity * 0.7; // 30% penalty
         }
@@ -577,10 +581,10 @@ export class MatchingService {
     
     return {
       matchedItemId: bestMatch.item._id,
-      matchedDescription: bestMatch.item.description,
-      matchedCode: bestMatch.item.code || '',
-      matchedUnit: bestMatch.item.unit || '',
-      matchedRate: bestMatch.item.rate,
+      matchedDescription: bestMatch.item.description || bestMatch.item.name || '',
+      matchedCode: bestMatch.item.code || bestMatch.item.id || '',
+      matchedUnit: bestMatch.item.unit || bestMatch.item.uom_id || '',
+      matchedRate: bestMatch.item.rate || bestMatch.item.operation_cost || 0,
       confidence: bestMatch.score,
       method: 'V2'
     };
@@ -645,7 +649,7 @@ export class MatchingService {
             // Boost score significantly for unit match
             finalScore = Math.min(similarity + 0.3, 0.99); // Add 30% boost
           }
-        } else if (queryUnit && !item.unit) {
+        } else if (queryUnit && !(item.unit || item.uom_id)) {
           // Penalize items without units
           finalScore = similarity * 0.7; // 30% penalty
         }
@@ -663,10 +667,10 @@ export class MatchingService {
     
     return {
       matchedItemId: bestMatch.item._id,
-      matchedDescription: bestMatch.item.description,
-      matchedCode: bestMatch.item.code || '',
-      matchedUnit: bestMatch.item.unit || '',
-      matchedRate: bestMatch.item.rate,
+      matchedDescription: bestMatch.item.description || bestMatch.item.name || '',
+      matchedCode: bestMatch.item.code || bestMatch.item.id || '',
+      matchedUnit: bestMatch.item.unit || bestMatch.item.uom_id || '',
+      matchedRate: bestMatch.item.rate || bestMatch.item.operation_cost || 0,
       confidence: bestMatch.score,
       method: 'V1'
     };
@@ -696,7 +700,7 @@ export class MatchingService {
    * Generate embeddings for BOQ items (for price list)
    */
   async generateBOQEmbeddings(
-    items: Array<{ description: string; category?: string; subcategory?: string; unit?: string }>,
+    items: Array<{ description: string; category?: string; subcategory?: string; unit?: string; uom_id?: string }>,
     provider: 'V2' | 'V1'
   ): Promise<Map<string, number[]>> {
     await this.ensureClientsInitialized();
@@ -716,7 +720,8 @@ export class MatchingService {
           } else if (item.subcategory) {
             parts.push(item.subcategory);
           }
-          if (item.unit) parts.push(item.unit);
+          const unit = item.unit || item.uom_id;
+          if (unit) parts.push(unit);
           return parts.join(' ');
         });
         
@@ -746,7 +751,8 @@ export class MatchingService {
           } else if (item.subcategory) {
             parts.push(item.subcategory);
           }
-          if (item.unit) parts.push(item.unit);
+          const unit = item.unit || item.uom_id;
+          if (unit) parts.push(unit);
           return parts.join(' ');
         });
         
