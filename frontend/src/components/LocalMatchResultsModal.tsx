@@ -103,14 +103,14 @@ export function LocalMatchResultsModal({ jobId, onClose }: LocalMatchResultsModa
         // Skip context headers
         if (result.matchMethod === 'CONTEXT') return;
         
-        // Current match data
-        const currentMatchData = result.matchedDescription ? {
+        // Current match data - Always create if we have any matched data
+        const currentMatchData = (result.matchedDescription || result.matchedItemId) ? {
           matchedDescription: result.matchedDescription || '',
           matchedCode: result.matchedCode,
           matchedUnit: result.matchedUnit,
           matchedRate: result.matchedRate || 0,
           confidence: result.confidence || 0,
-          totalPrice: result.totalPrice,
+          totalPrice: result.totalPrice || ((result.originalQuantity || 0) * (result.matchedRate || 0)),
         } : null;
         
         // Determine match type based on matchMethod and isManuallyEdited
@@ -139,7 +139,13 @@ export function LocalMatchResultsModal({ jobId, onClose }: LocalMatchResultsModa
       console.log('[LocalMatchResultsModal] Initialized match data:', {
         localMatches: Object.keys(localData).length,
         manualMatches: Object.keys(manualData).length,
-        initialTypes
+        initialTypes,
+        sampleResult: results[0] ? {
+          matchedDescription: results[0].matchedDescription,
+          matchedUnit: results[0].matchedUnit,
+          matchedRate: results[0].matchedRate,
+          matchMethod: results[0].matchMethod,
+        } : null
       });
       
       setMatchDataStore({
@@ -368,14 +374,15 @@ export function LocalMatchResultsModal({ jobId, onClose }: LocalMatchResultsModa
     }
     
     // If no stored data and type is LOCAL, return the current result data
-    if (type === 'LOCAL' && result.matchedDescription) {
+    // Even if matchedDescription is empty, return data if we have other fields
+    if (type === 'LOCAL' && (result.matchedDescription || result.matchedItemId || result.matchedRate !== undefined)) {
       return {
-        matchedDescription: result.matchedDescription,
+        matchedDescription: result.matchedDescription || '',
         matchedCode: result.matchedCode,
         matchedUnit: result.matchedUnit,
         matchedRate: result.matchedRate || 0,
         confidence: result.confidence || 0,
-        totalPrice: result.totalPrice,
+        totalPrice: result.totalPrice || ((result.originalQuantity || 0) * (result.matchedRate || 0)),
       };
     }
     

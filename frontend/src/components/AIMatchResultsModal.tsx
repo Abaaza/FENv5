@@ -515,14 +515,15 @@ export function AIMatchResultsModal({ jobId, jobMatchingMethod, onClose }: AIMat
     }
     
     // If no stored data and type is AI, return the current result data
-    if (type === 'AI' && result.matchedDescription) {
+    // Even if matchedDescription is empty, return data if we have other fields
+    if (type === 'AI' && (result.matchedDescription || result.matchedItemId || result.matchedRate !== undefined)) {
       return {
-        matchedDescription: result.matchedDescription,
+        matchedDescription: result.matchedDescription || '',
         matchedCode: result.matchedCode,
         matchedUnit: result.matchedUnit,
         matchedRate: result.matchedRate || 0,
         confidence: result.confidence || 0,
-        totalPrice: result.totalPrice,
+        totalPrice: result.totalPrice || ((result.originalQuantity || 0) * (result.matchedRate || 0)),
       };
     }
     
