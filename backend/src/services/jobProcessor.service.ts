@@ -51,8 +51,10 @@ export class JobProcessorService extends EventEmitter {
     // FENv5 matching service expects 'V2' and 'V1' instead of 'COHERE' and 'OPENAI'
     switch (method) {
       case 'COHERE':
+      case 'V2':
         return 'V2';
       case 'OPENAI':
+      case 'V1':
         return 'V1';
       case 'LOCAL':
       default:
