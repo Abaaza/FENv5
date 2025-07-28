@@ -108,14 +108,14 @@ export function AIMatchResultsModal({ jobId, jobMatchingMethod, onClose }: AIMat
         // Skip context headers
         if (result.matchMethod === 'CONTEXT') return;
         
-        // Current match data
-        const currentMatchData = result.matchedDescription ? {
+        // Current match data - Always create if we have any matched data
+        const currentMatchData = (result.matchedDescription || result.matchedItemId) ? {
           matchedDescription: result.matchedDescription || '',
           matchedCode: result.matchedCode,
           matchedUnit: result.matchedUnit,
           matchedRate: result.matchedRate || 0,
           confidence: result.confidence || 0,
-          totalPrice: result.totalPrice,
+          totalPrice: result.totalPrice || ((result.originalQuantity || 0) * (result.matchedRate || 0)),
         } : null;
         
         // Determine match type based on matchMethod and isManuallyEdited
@@ -150,7 +150,13 @@ export function AIMatchResultsModal({ jobId, jobMatchingMethod, onClose }: AIMat
         aiMatches: Object.keys(aiData).length,
         localMatches: Object.keys(localData).length,
         manualMatches: Object.keys(manualData).length,
-        initialTypes
+        initialTypes,
+        sampleResult: results[0] ? {
+          matchedDescription: results[0].matchedDescription,
+          matchedUnit: results[0].matchedUnit,
+          matchedRate: results[0].matchedRate,
+          matchMethod: results[0].matchMethod,
+        } : null
       });
       
       setMatchDataStore({

@@ -23,10 +23,17 @@ interface MatchResult {
 interface PriceItem {
   _id: string;
   id: string;
+  // Old schema fields
   code?: string;
-  description: string;
+  description?: string;
   unit?: string;
   rate?: number;
+  // New schema fields
+  name?: string;
+  product_template_variant_value_ids?: string;
+  operation_cost?: number;
+  uom_id?: string;
+  // Common fields
   category?: string;
   subcategory?: string;
 }
@@ -124,10 +131,10 @@ export function ManualMatchModal({
     try {
       await onSave({
         matchedItemId: selectedItem._id,
-        matchedDescription: selectedItem.description,
-        matchedCode: selectedItem.code,
-        matchedUnit: selectedItem.unit,
-        matchedRate: selectedItem.rate || 0,
+        matchedDescription: selectedItem.description || selectedItem.name || '',
+        matchedCode: selectedItem.code || selectedItem.id,
+        matchedUnit: selectedItem.unit || selectedItem.uom_id,
+        matchedRate: selectedItem.rate || selectedItem.operation_cost || 0,
       });
       onClose();
       toast.success('Match saved successfully');
@@ -139,7 +146,7 @@ export function ManualMatchModal({
     }
   };
 
-  const totalPrice = (result.originalQuantity || 0) * (selectedItem?.rate || 0);
+  const totalPrice = (result.originalQuantity || 0) * (selectedItem?.rate || selectedItem?.operation_cost || 0);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -212,12 +219,12 @@ export function ManualMatchModal({
                   >
                     <div className="space-y-1">
                       <div className="font-medium text-sm">
-                        {item.code && <span className="text-muted-foreground">{item.code} - </span>}
-                        {item.description}
+                        {(item.code || item.id) && <span className="text-muted-foreground">{item.code || item.id} - </span>}
+                        {item.description || item.name || ''}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-muted-foreground">
-                        <span>Rate: {formatPrice(item.rate || 0)}</span>
-                        <span>Unit: {item.unit || '-'}</span>
+                        <span>Rate: {formatPrice(item.rate || item.operation_cost || 0)}</span>
+                        <span>Unit: {item.unit || item.uom_id || '-'}</span>
                         {item.category && <span>Category: {item.category}</span>}
                       </div>
                     </div>
@@ -242,22 +249,22 @@ export function ManualMatchModal({
               <div className="space-y-1 text-sm">
                 <p>
                   <span className="text-muted-foreground">Description:</span>{' '}
-                  <span className="font-medium">{selectedItem.description}</span>
+                  <span className="font-medium">{selectedItem.description || selectedItem.name || ''}</span>
                 </p>
-                {selectedItem.code && (
+                {(selectedItem.code || selectedItem.id) && (
                   <p>
                     <span className="text-muted-foreground">Code:</span>{' '}
-                    <span className="font-medium">{selectedItem.code}</span>
+                    <span className="font-medium">{selectedItem.code || selectedItem.id}</span>
                   </p>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mt-2">
                   <div>
                     <span className="text-muted-foreground">Unit:</span>{' '}
-                    <span className="font-medium">{selectedItem.unit || '-'}</span>
+                    <span className="font-medium">{selectedItem.unit || selectedItem.uom_id || '-'}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Rate:</span>{' '}
-                    <span className="font-medium">{formatPrice(selectedItem.rate || 0)}</span>
+                    <span className="font-medium">{formatPrice(selectedItem.rate || selectedItem.operation_cost || 0)}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Total:</span>{' '}
