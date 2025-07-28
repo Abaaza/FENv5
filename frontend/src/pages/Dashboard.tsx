@@ -300,14 +300,14 @@ export default function Dashboard() {
             ) : systemHealth && systemHealth.apiStatus ? (
               <>
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Cohere API */}
+                  {/* V2 API */}
                   <div className={cn(
                     "p-4 rounded-lg border text-center",
                     getApiStatusColor(systemHealth.apiStatus?.cohere?.status || 'error')
                   )}>
                     <div className="flex items-center justify-center gap-2 mb-2">
                       {getApiStatusIcon(systemHealth.apiStatus?.cohere?.status || 'error')}
-                      <span className="font-medium">Cohere API</span>
+                      <span className="font-medium">V2 API</span>
                     </div>
                     <p className="text-sm font-semibold capitalize mb-1">
                       {(systemHealth.apiStatus?.cohere?.status || 'error').replace(/_/g, ' ')}
@@ -319,14 +319,14 @@ export default function Dashboard() {
                     </p>
                   </div>
 
-                  {/* OpenAI API */}
+                  {/* V1 API */}
                   <div className={cn(
                     "p-4 rounded-lg border text-center",
                     getApiStatusColor(systemHealth.apiStatus?.openai?.status || 'error')
                   )}>
                     <div className="flex items-center justify-center gap-2 mb-2">
                       {getApiStatusIcon(systemHealth.apiStatus?.openai?.status || 'error')}
-                      <span className="font-medium">OpenAI API</span>
+                      <span className="font-medium">V1 API</span>
                     </div>
                     <p className="text-sm font-semibold capitalize mb-1">
                       {(systemHealth.apiStatus?.openai?.status || 'error').replace(/_/g, ' ')}

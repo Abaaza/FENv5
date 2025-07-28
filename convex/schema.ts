@@ -25,39 +25,42 @@ export default defineSchema({
   }).index("by_key", ["key"]),
 
   priceItems: defineTable({
-    id: v.string(),
+    id: v.string(), // External ID from the system
+    
+    // New schema fields (optional for backward compatibility)
+    name: v.optional(v.string()), // Product name
+    product_template_variant_value_ids: v.optional(v.string()), // Variant/size information
+    operation_cost: v.optional(v.number()), // Price/rate
+    uom_id: v.optional(v.string()), // Unit of measurement
+    
+    // Old schema fields (kept for backward compatibility)
     code: v.optional(v.string()),
     ref: v.optional(v.string()),
-    description: v.string(),
-    keywords: v.optional(v.array(v.string())),
-    // Construction-specific fields
+    description: v.optional(v.string()), // Combined name + variant for better matching
+    keywords: v.optional(v.array(v.string())), // For search optimization
+    category: v.optional(v.string()), // Can be derived from name
+    subcategory: v.optional(v.string()),
     material_type: v.optional(v.string()),
     material_grade: v.optional(v.string()),
     material_size: v.optional(v.string()),
     material_finish: v.optional(v.string()),
-    category: v.optional(v.string()),
-    subcategory: v.optional(v.string()),
     work_type: v.optional(v.string()),
     brand: v.optional(v.string()),
     unit: v.optional(v.string()),
-    rate: v.number(),
+    rate: v.optional(v.number()),
     labor_rate: v.optional(v.number()),
     material_rate: v.optional(v.number()),
     wastage_percentage: v.optional(v.number()),
-    // Supplier info
     supplier: v.optional(v.string()),
     location: v.optional(v.string()),
     availability: v.optional(v.string()),
     remark: v.optional(v.string()),
-    // Legacy fields (keeping for compatibility)
-    subCategoryCode: v.optional(v.string()),
-    subCategoryName: v.optional(v.string()),
-    sub_category: v.optional(v.string()),
-    type: v.optional(v.string()),
     vendor: v.optional(v.string()),
+    
     // Embedding fields
     embedding: v.optional(v.array(v.number())),
-    embeddingProvider: v.optional(v.union(v.literal("cohere"), v.literal("openai"))),
+    embeddingProvider: v.optional(v.union(v.literal("V2"), v.literal("V1"))),
+    
     // Metadata
     isActive: v.boolean(),
     createdAt: v.number(),
@@ -65,13 +68,11 @@ export default defineSchema({
     createdBy: v.id("users"),
   })
     .index("by_item_id", ["id"])
-    .index("by_code", ["code"])
-    .index("by_category", ["category"])
-    .index("by_subcategory", ["subcategory"])
+    .index("by_name", ["name"])
     .index("by_active", ["isActive"])
     .searchIndex("search_price_items", {
-      searchField: "description",
-      filterFields: ["category", "subcategory", "isActive"]
+      searchField: "name",
+      filterFields: ["isActive"]
     }),
 
   aiMatchingJobs: defineTable({
@@ -95,8 +96,8 @@ export default defineSchema({
     matchedCount: v.number(),
     matchingMethod: v.union(
       v.literal("LOCAL"),
-      v.literal("COHERE"),
-      v.literal("OPENAI")
+      v.literal("V2"),
+      v.literal("V1")
     ),
     totalValue: v.optional(v.number()),
     error: v.optional(v.string()),

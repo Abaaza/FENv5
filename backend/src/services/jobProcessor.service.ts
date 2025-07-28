@@ -47,6 +47,19 @@ export class JobProcessorService extends EventEmitter {
     this.startProcessor();
   }
 
+  private translateMethodForMatchingService(method: string): 'LOCAL' | 'V2' | 'V1' {
+    // FENv5 matching service expects 'V2' and 'V1' instead of 'COHERE' and 'OPENAI'
+    switch (method) {
+      case 'COHERE':
+        return 'V2';
+      case 'OPENAI':
+        return 'V1';
+      case 'LOCAL':
+      default:
+        return 'LOCAL';
+    }
+  }
+
   async addJob(jobId: string, userId: string, items: any[], method: string): Promise<void> {
     // Console log removed for performance
     
@@ -514,7 +527,9 @@ export class JobProcessorService extends EventEmitter {
     const batchNumber = Math.floor(startIndex / this.BATCH_SIZE) + 1;
     
     // For AI methods, pre-generate embeddings for all items in the batch
+    // TODO: Re-enable batch embeddings once price items have embeddings in the database
     let batchEmbeddings: Map<string, number[]> | null = null;
+    /*
     if (['V2', 'V1'].includes(job.method)) {
       const itemsWithQuantity = batch.filter(item => 
         item.quantity !== undefined && item.quantity !== null && item.quantity !== 0
@@ -529,7 +544,7 @@ export class JobProcessorService extends EventEmitter {
               description: item.description,
               contextHeaders: item.contextHeaders
             })),
-            job.method.toLowerCase() as 'V2' | 'V1'
+            this.translateMethodForMatchingService(job.method) as 'V2' | 'V1'
           );
           
           this.emitLog(job.jobId, 'success', `Generated embeddings for ${batchEmbeddings.size} items`);
@@ -538,6 +553,7 @@ export class JobProcessorService extends EventEmitter {
         }
       }
     }
+    */
 
     for (let i = 0; i < batch.length; i++) {
       // Check if job was cancelled before processing each item (re-fetch from map)
@@ -592,25 +608,28 @@ export class JobProcessorService extends EventEmitter {
         const matchStartTime = Date.now();
         let matchResult;
         
-        // Use pre-generated embeddings for AI methods if available
-        if (batchEmbeddings && batchEmbeddings.has(item.description) && ['V2', 'V1'].includes(job.method)) {
+        // Always use regular matching for now since price items don't have pre-computed embeddings
+        // TODO: Re-enable this once price items have embeddings in the database
+        /*
+        if (batchEmbeddings && batchEmbeddings.has(item.description) && ['COHERE', 'OPENAI'].includes(job.method)) {
           const embedding = batchEmbeddings.get(item.description)!;
           matchResult = await this.matchingService.matchItemWithEmbedding(
             item.description,
-            job.method as 'V2' | 'V1',
+            this.translateMethodForMatchingService(job.method) as 'V2' | 'V1',
             embedding,
             priceItems,
             item.contextHeaders
           );
         } else {
-          // Fallback to regular matching
+        */
+          // Use regular matching which generates embeddings on-the-fly
           matchResult = await this.matchingService.matchItem(
             item.description,
-            job.method as any,
+            this.translateMethodForMatchingService(job.method),
             priceItems,
             item.contextHeaders
           );
-        }
+        //}
         
         const matchDuration = Date.now() - matchStartTime;
 

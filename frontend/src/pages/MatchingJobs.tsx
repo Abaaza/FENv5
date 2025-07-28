@@ -229,7 +229,7 @@ export default function Projects() {
   // Get the selected job to access its matching method
   const selectedJob = jobs?.find(job => job._id === selectedJobId);
   const jobMatchingMethod = selectedJob?.matchingMethod || 'LOCAL';
-  const isAIJob = jobMatchingMethod === 'COHERE' || jobMatchingMethod === 'OPENAI';
+  const isAIJob = jobMatchingMethod === 'V2' || jobMatchingMethod === 'V1';
   const isLocalJob = jobMatchingMethod === 'LOCAL';
   const isAIDisabled = !isAIJob; // AI is disabled for LOCAL jobs
 
@@ -326,8 +326,8 @@ export default function Projects() {
       const manualMatches: typeof manualMatchResults = {};
       
       results.forEach((result: MatchResult) => {
-        // For AI methods (COHERE/OPENAI), always store the original AI match
-        if (result.matchMethod === 'COHERE' || result.matchMethod === 'OPENAI') {
+        // For AI methods (V2/V1), always store the original AI match
+        if (result.matchMethod === 'V2' || result.matchMethod === 'V1') {
           // Store the original AI match
           aiMatches[result._id] = {
             matchedDescription: result.matchedDescription || '',
@@ -1113,7 +1113,7 @@ export default function Projects() {
               ) : (
                 <AIMatchResultsModal
                   jobId={selectedJobId}
-                  jobMatchingMethod={selectedJob.matchingMethod as 'COHERE' | 'OPENAI'}
+                  jobMatchingMethod={selectedJob.matchingMethod as 'V2' | 'V1'}
                   onClose={() => setShowResultsModal(false)}
                 />
               )}

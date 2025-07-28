@@ -29,12 +29,12 @@ interface JobStatus {
   startedAt?: number;
 }
 
-type MatchingMethod = 'LOCAL' | 'COHERE' | 'OPENAI';
+type MatchingMethod = 'LOCAL' | 'V2' | 'V1';
 
 const matchingMethods = [
   { value: 'LOCAL', label: 'Local Matching', description: 'Fast fuzzy string matching' },
-  { value: 'COHERE', label: 'Cohere AI', description: 'Neural embeddings with Cohere' },
-  { value: 'OPENAI', label: 'OpenAI', description: 'GPT embeddings' },
+  { value: 'V2', label: 'V2 AI', description: 'Advanced neural embeddings' },
+  { value: 'V1', label: 'V1 AI', description: 'Standard embeddings' },
 ];
 
 export default function PriceMatching() {

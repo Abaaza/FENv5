@@ -197,40 +197,59 @@ export async function importCSV(req: Request, res: Response): Promise<void> {
     }
 
     const items = records.map((record: any) => {
-      // Parse keywords if they exist as comma-separated string
-      let keywords: string[] | undefined;
-      if (record.keywords) {
-        keywords = record.keywords.split(',').map((k: string) => k.trim()).filter((k: string) => k);
-      }
+      // Check if this is the new schema format
+      if (record.id && record.name && record.operation_cost !== undefined && record.uom_id) {
+        // New schema format
+        const variant = record.product_template_variant_value_ids || '';
+        const description = variant ? `${record.name} - ${variant}` : record.name;
+        
+        // Generate keywords from name and variant
+        const keywords: string[] = [];
+        keywords.push(...record.name.toLowerCase().split(/\s+/));
+        if (variant) {
+          keywords.push(...variant.toLowerCase().split(/[:\s,]+/).filter((w: string) => w.length > 2));
+        }
 
-      return {
-        id: record._id || record.id || record.ID || record.Id || `${Date.now()}-${Math.random()}`,
-        code: record.Code || record.code || record.CODE,
-        description: record.Description || record.description || record.DESCRIPTION,
-        keywords,
-        // Construction-specific fields
-        material_type: record.material_type || record.Material_Type || record.type || record.Type,
-        material_grade: record.material_grade || record.Material_Grade || record.grade || record.Grade,
-        material_size: record.material_size || record.Material_Size || record.size || record.Size,
-        material_finish: record.material_finish || record.Material_Finish || record.finish || record.Finish,
-        category: record.Category || record.category || record.CATEGORY,
-        subcategory: record.SubCategory || record.subcategory || record.Subcategory || record.sub_category || record.Sub_Category,
-        work_type: record.work_type || record.Work_Type || record.operation || record.Operation,
-        brand: record.brand || record.Brand || record.vendor || record.Vendor,
-        unit: record.Unit || record.unit || record.UNIT || 'pcs',
-        rate: parseFloat(record.Rate || record.rate || record.RATE || record.price || record.Price || '0'),
-        labor_rate: parseFloat(record.labor_rate || record.Labor_Rate || record.labour_rate || record.Labour_Rate || '0'),
-        material_rate: parseFloat(record.material_rate || record.Material_Rate || '0'),
-        wastage_percentage: parseFloat(record.wastage_percentage || record.Wastage_Percentage || record.wastage || record.Wastage || '0'),
-        // Supplier info
-        supplier: record.supplier || record.Supplier || record.vendor || record.Vendor,
-        location: record.location || record.Location,
-        availability: record.availability || record.Availability || 'in_stock',
-        // Additional fields from old schema (for compatibility)
-        ref: record.Ref || record.ref || record.REF,
-        remark: record.remark || record.Remark || record.REMARK,
-      };
-    }).filter(item => item.id && item.description);
+        return {
+          id: record.id,
+          name: record.name,
+          product_template_variant_value_ids: variant,
+          operation_cost: parseFloat(record.operation_cost.toString()),
+          uom_id: record.uom_id,
+          description,
+          keywords: [...new Set(keywords)], // Remove duplicates
+          category: extractCategory(record.name),
+        };
+      } else {
+        // Old schema format (backward compatibility)
+        let keywords: string[] | undefined;
+        if (record.keywords) {
+          keywords = record.keywords.split(',').map((k: string) => k.trim()).filter((k: string) => k);
+        }
+
+        return {
+          id: record._id || record.id || record.ID || record.Id || `${Date.now()}-${Math.random()}`,
+          name: record.Description || record.description || record.DESCRIPTION || record.name || '',
+          product_template_variant_value_ids: record.product_template_variant_value_ids || '',
+          operation_cost: parseFloat(record.Rate || record.rate || record.RATE || record.price || record.Price || record.operation_cost || '0'),
+          uom_id: record.Unit || record.unit || record.UNIT || record.uom_id || 'pcs',
+          description: record.Description || record.description || record.DESCRIPTION,
+          keywords,
+          category: record.Category || record.category || record.CATEGORY,
+        };
+      }
+    }).filter(item => item.id && (item.description || item.name));
+
+    // Helper function to extract category
+    function extractCategory(name: string): string {
+      const nameLower = name.toLowerCase();
+      if (nameLower.includes('drill') || nameLower.includes('bit')) return 'Tools';
+      if (nameLower.includes('steel') || nameLower.includes('iron')) return 'Materials';
+      if (nameLower.includes('fence') || nameLower.includes('gate')) return 'Fencing';
+      if (nameLower.includes('post') || nameLower.includes('pole')) return 'Posts';
+      if (nameLower.includes('wire') || nameLower.includes('mesh')) return 'Wire Products';
+      return 'General';
+    }
 
     if (items.length === 0) {
       res.status(400).json({ error: 'No valid items found in file' });
@@ -264,23 +283,21 @@ export async function exportCSV(req: Request, res: Response): Promise<void> {
     const items = await convex.query(api.priceItems.getAll);
     
     const csvData = items.map(item => ({
-      _id: item._id,
-      code: item.code || '',
-      ref: item.ref || '',
-      description: item.description,
+      id: item.id,
+      name: item.name,
+      product_template_variant_value_ids: item.product_template_variant_value_ids || '',
+      operation_cost: item.operation_cost,
+      uom_id: item.uom_id,
+      description: item.description || '',
       category: item.category || '',
-      subcategory: item.subcategory || '',
-      unit: item.unit || '',
-      rate: item.rate,
       keywords: item.keywords?.join(',') || '',
-      remark: item.remark || '',
     }));
 
     const csv = stringify(csvData, {
       header: true,
       columns: [
-        '_id', 'code', 'ref', 'description', 'category', 
-        'subcategory', 'unit', 'rate', 'keywords', 'remark'
+        'id', 'name', 'product_template_variant_value_ids', 
+        'operation_cost', 'uom_id', 'description', 'category', 'keywords'
       ],
     });
 
@@ -346,42 +363,34 @@ export async function searchPriceItems(req: Request, res: Response): Promise<voi
     const searchTerm = query.toLowerCase();
     const scoredItems = allItems.map((item: any) => {
       let score = 0;
+      const name = (item.name || '').toLowerCase();
       const description = (item.description || '').toLowerCase();
-      const code = (item.code || '').toLowerCase();
+      const variant = (item.product_template_variant_value_ids || '').toLowerCase();
       const category = (item.category || '').toLowerCase();
       
       // Exact matches get highest score
-      if (description === searchTerm || code === searchTerm) {
+      if (name === searchTerm || description === searchTerm) {
         score = 100;
       }
       // Starts with gets high score
-      else if (description.startsWith(searchTerm) || code.startsWith(searchTerm)) {
+      else if (name.startsWith(searchTerm) || description.startsWith(searchTerm)) {
         score = 80;
       }
       // Word boundary matches
-      else if (description.includes(' ' + searchTerm) || description.includes(searchTerm + ' ')) {
+      else if (name.includes(' ' + searchTerm) || name.includes(searchTerm + ' ')) {
         score = 60;
       }
       // Contains match
-      else if (description.includes(searchTerm) || code.includes(searchTerm)) {
+      else if (name.includes(searchTerm) || description.includes(searchTerm) || variant.includes(searchTerm)) {
         score = 40;
       }
       // Category match
       else if (category.includes(searchTerm)) {
         score = 30;
       }
-      // Check other fields
-      else {
-        const otherFields = [
-          item.subcategory,
-          item.material_type,
-          item.brand,
-          item.supplier,
-        ].filter(Boolean).join(' ').toLowerCase();
-        
-        if (otherFields.includes(searchTerm)) {
-          score = 20;
-        }
+      // Check unit of measurement
+      else if ((item.uom_id || '').toLowerCase().includes(searchTerm)) {
+        score = 20;
       }
       
       return { item, score };
@@ -556,19 +565,40 @@ async function processImportAsync(
       const batch = items.slice(i, i + batchSize);
       
       try {
-        // Process items individually since bulkImport doesn't exist
-        for (const item of batch) {
-          try {
-            await convex.mutation(api.priceItems.create, {
-              ...item,
-              userId: toConvexId<'users'>(userId),
-            });
-            results.created++;
-          } catch (err: any) {
-            if (err.message?.includes('duplicate')) {
-              results.skipped++;
-            } else {
-              results.errors.push(`Item ${item.id}: ${err.message}`);
+        // Use createBatch mutation for better performance
+        try {
+          const batchItems = batch.map(item => ({
+            id: item.id,
+            name: item.name,
+            product_template_variant_value_ids: item.product_template_variant_value_ids,
+            operation_cost: item.operation_cost,
+            uom_id: item.uom_id,
+            description: item.description,
+            keywords: item.keywords,
+            category: item.category,
+          }));
+          
+          await convex.mutation(api.priceItems.createBatch, {
+            items: batchItems,
+            userId: toConvexId<'users'>(userId),
+          });
+          
+          results.created += batch.length;
+        } catch (err: any) {
+          // If batch fails, try individually
+          for (const item of batch) {
+            try {
+              await convex.mutation(api.priceItems.create, {
+                ...item,
+                userId: toConvexId<'users'>(userId),
+              });
+              results.created++;
+            } catch (err: any) {
+              if (err.message?.includes('duplicate')) {
+                results.skipped++;
+              } else {
+                results.errors.push(`Item ${item.id}: ${err.message}`);
+              }
             }
           }
         }

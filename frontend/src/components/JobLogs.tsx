@@ -27,7 +27,7 @@ export function JobLogs({ logs, className, title = "Processing Logs", jobStatus,
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [elapsedTime, setElapsedTime] = useState('00:00');
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
-  const isAIMethod = matchingMethod && ['COHERE', 'OPENAI', 'HYBRID', 'HYBRID_CATEGORY', 'ADVANCED'].includes(matchingMethod);
+  const isAIMethod = matchingMethod && ['V2', 'V1', 'HYBRID', 'HYBRID_CATEGORY', 'ADVANCED'].includes(matchingMethod);
 
   // Parse batch progress from logs
   useEffect(() => {

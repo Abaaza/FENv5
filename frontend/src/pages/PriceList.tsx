@@ -35,34 +35,23 @@ import { useCurrency } from '../hooks/useCurrency';
 interface PriceItem {
   _id: string;
   id: string;
+  // New schema fields
+  name?: string;
+  product_template_variant_value_ids?: string;
+  operation_cost?: number;
+  uom_id?: string;
+  // Old schema fields (for backward compatibility)
   code?: string;
-  ref?: string;
-  description: string;
-  // Construction-specific fields
-  material_type?: string;
-  material_grade?: string;
-  material_size?: string;
-  material_finish?: string;
+  description?: string;
   category?: string;
-  subcategory?: string;
-  work_type?: string;
-  brand?: string;
   unit?: string;
   rate?: number;
-  labor_rate?: number;
-  material_rate?: number;
-  wastage_percentage?: number;
-  // Supplier info
-  supplier?: string;
-  location?: string;
-  availability?: string;
-  lastUpdated?: number;
-  // Additional fields
   keywords?: string[];
-  remark?: string;
+  isActive?: boolean;
+  lastUpdated?: number;
 }
 
-type SortField = 'code' | 'description' | 'category' | 'rate' | 'unit';
+type SortField = 'name' | 'operation_cost' | 'category' | 'uom_id';
 type SortDirection = 'asc' | 'desc';
 
 export default function PriceList() {
@@ -81,7 +70,7 @@ export default function PriceList() {
   const [deleteRateLimited, setDeleteRateLimited] = useState(false);
   const [showItemDialog, setShowItemDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<PriceItem | null>(null);
-  const [sortField, setSortField] = useState<SortField>('description');
+  const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 200;
@@ -90,18 +79,14 @@ export default function PriceList() {
   
   const form = useForm<any>({
     defaultValues: {
-      code: '',
-      ref: '',
+      id: '',
+      name: '',
+      product_template_variant_value_ids: '',
+      operation_cost: 0,
+      uom_id: '',
       description: '',
       category: '',
-      subcategory: '',
-      unit: '',
-      rate: 0,
-      remark: '',
-      keyword1: '',
-      keyword2: '',
-      phrase1: '',
-      phrase2: '',
+      keywords: [],
     },
   });
 
@@ -173,14 +158,9 @@ export default function PriceList() {
         return false;
       }
       
-      // Subcategory filter
-      if (selectedSubcategory !== 'all' && item.subcategory !== selectedSubcategory) {
-        return false;
-      }
-      
       // Incomplete filter
       if (showIncompleteOnly) {
-        const isIncomplete = !item.category || !item.subcategory || !item.rate || item.rate === 0 || !item.unit || !item.description;
+        const isIncomplete = !item.name || !item.operation_cost || item.operation_cost === 0 || !item.uom_id;
         if (!isIncomplete) return false;
       }
       
@@ -196,7 +176,7 @@ export default function PriceList() {
       let aVal = a[sortField] || '';
       let bVal = b[sortField] || '';
       
-      if (sortField === 'rate') {
+      if (sortField === 'operation_cost') {
         aVal = Number(aVal) || 0;
         bVal = Number(bVal) || 0;
       }
@@ -421,20 +401,15 @@ export default function PriceList() {
 
   const handleEdit = (item: PriceItem) => {
     setEditingItem(item);
-    const keywords = item.keywords || [];
     form.reset({
-      code: item.code || '',
-      ref: item.ref || '',
+      id: item.id,
+      name: item.name,
+      product_template_variant_value_ids: item.product_template_variant_value_ids || '',
+      operation_cost: item.operation_cost,
+      uom_id: item.uom_id,
       description: item.description || '',
       category: item.category || '',
-      subcategory: item.subcategory || '',
-      unit: item.unit || '',
-      rate: item.rate || 0,
-      remark: item.remark || '',
-      keyword1: keywords[0] || '',
-      keyword2: keywords[1] || '',
-      phrase1: keywords[2] || '',
-      phrase2: keywords[3] || '',
+      keywords: item.keywords || [],
     });
     setShowItemDialog(true);
   };
@@ -446,17 +421,10 @@ export default function PriceList() {
   };
 
   const onSubmit = (data: any) => {
-    // Prepare keywords array from individual fields
-    const keywords = [];
-    if (data.keyword1) keywords.push(data.keyword1);
-    if (data.keyword2) keywords.push(data.keyword2);
-    if (data.phrase1) keywords.push(data.phrase1);
-    if (data.phrase2) keywords.push(data.phrase2);
-    
-    const { keyword1, keyword2, phrase1, phrase2, ...itemData } = data;
     const submitData = {
-      ...itemData,
-      keywords: keywords.length > 0 ? keywords : undefined,
+      ...data,
+      // Ensure operation_cost is a number
+      operation_cost: parseFloat(data.operation_cost),
     };
     
     createUpdateMutation.mutate(submitData);
@@ -831,22 +799,15 @@ export default function PriceList() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-2 w-24">
+                      <th className="text-left p-2 min-w-[200px]">
                         <button
-                          onClick={() => handleSort('code')}
+                          onClick={() => handleSort('name')}
                           className="flex items-center gap-1 hover:text-primary"
                         >
-                          Code {getSortIcon('code')}
+                          Name {getSortIcon('name')}
                         </button>
                       </th>
-                      <th className="text-left p-2 min-w-[300px]">
-                        <button
-                          onClick={() => handleSort('description')}
-                          className="flex items-center gap-1 hover:text-primary"
-                        >
-                          Description {getSortIcon('description')}
-                        </button>
-                      </th>
+                      <th className="text-left p-2 min-w-[250px]">Variant/Size</th>
                       <th className="text-left p-2">
                         <button
                           onClick={() => handleSort('category')}
@@ -857,18 +818,18 @@ export default function PriceList() {
                       </th>
                       <th className="text-left p-2">
                         <button
-                          onClick={() => handleSort('unit')}
+                          onClick={() => handleSort('uom_id')}
                           className="flex items-center gap-1 hover:text-primary"
                         >
-                          Unit {getSortIcon('unit')}
+                          Unit {getSortIcon('uom_id')}
                         </button>
                       </th>
                       <th className="text-left p-2">
                         <button
-                          onClick={() => handleSort('rate')}
+                          onClick={() => handleSort('operation_cost')}
                           className="flex items-center gap-1 hover:text-primary"
                         >
-                          Rate {getSortIcon('rate')}
+                          Cost {getSortIcon('operation_cost')}
                         </button>
                       </th>
                       <th className="text-left p-2 w-20">Actions</th>
@@ -876,7 +837,7 @@ export default function PriceList() {
                   </thead>
                   <tbody>
                     {paginatedItems.map((item: PriceItem) => {
-                      const isIncomplete = !item.category || !item.subcategory || !item.rate || !item.unit || !item.description;
+                      const isIncomplete = !item.name || !item.operation_cost || item.operation_cost === 0 || !item.uom_id;
                       
                       return (
                         <tr 
@@ -886,28 +847,21 @@ export default function PriceList() {
                             isIncomplete && "bg-orange-50 dark:bg-orange-900/10"
                           )}
                         >
-                          <td className="p-2 font-medium">{item.code || '-'}</td>
-                          <td className="p-2" title={item.description}>
-                            <div>
-                              {item.description || <span className="text-red-500">Missing</span>}
+                          <td className="p-2 font-medium">{item.name || <span className="text-red-500">Missing</span>}</td>
+                          <td className="p-2" title={item.product_template_variant_value_ids}>
+                            <div className="text-sm">
+                              {item.product_template_variant_value_ids || '-'}
                             </div>
                           </td>
                           <td className="p-2">
-                            <div>
-                              <div>{item.category || <span className="text-red-500">Missing</span>}</div>
-                              {item.subcategory ? (
-                                <div className="text-xs text-muted-foreground">{item.subcategory}</div>
-                              ) : (
-                                <div className="text-xs text-red-500">Missing</div>
-                              )}
-                            </div>
+                            {item.category || '-'}
                           </td>
                           <td className="p-2">
-                            {item.unit || <span className="text-red-500">Missing</span>}
+                            {item.uom_id || <span className="text-red-500">Missing</span>}
                           </td>
                           <td className="p-2 font-medium">
-                            {item.rate ? 
-                              formatPrice(item.rate) : 
+                            {item.operation_cost ? 
+                              formatPrice(item.operation_cost) : 
                               <span className="text-red-500">Missing</span>
                             }
                           </td>
@@ -940,7 +894,7 @@ export default function PriceList() {
               {/* Mobile Cards */}
               <div className="md:hidden space-y-4">
                 {paginatedItems.map((item: PriceItem) => {
-                  const isIncomplete = !item.category || !item.subcategory || !item.rate || !item.unit || !item.description;
+                  const isIncomplete = !item.name || !item.operation_cost || item.operation_cost === 0 || !item.uom_id;
                   
                   return (
                     <div 
@@ -958,13 +912,10 @@ export default function PriceList() {
                       )}
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <p className="font-medium text-sm">{item.code || 'No Code'}</p>
-                          <p className="text-sm mt-1">
-                            {item.description || <span className="text-red-500">No description</span>}
-                          </p>
-                          {(item.material_type || item.material_grade) && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {item.material_type} {item.material_grade && `- ${item.material_grade}`}
+                          <p className="font-medium text-sm">{item.name || <span className="text-red-500">No name</span>}</p>
+                          {item.product_template_variant_value_ids && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {item.product_template_variant_value_ids}
                             </p>
                           )}
                         </div>
@@ -974,28 +925,23 @@ export default function PriceList() {
                         <div>
                           <span className="text-muted-foreground">Unit:</span>
                           <p className="font-medium">
-                            {item.unit || <span className="text-red-500">Missing</span>}
+                            {item.uom_id || <span className="text-red-500">Missing</span>}
                           </p>
                         </div>
                         <div>
                           <span className="text-muted-foreground">Category:</span>
                           <p className="font-medium">
-                            {item.category || <span className="text-red-500">Missing</span>}
+                            {item.category || '-'}
                           </p>
-                          {item.subcategory ? (
-                            <p className="text-xs text-muted-foreground">{item.subcategory}</p>
-                          ) : (
-                            <p className="text-xs text-red-500">No subcategory</p>
-                          )}
                         </div>
                       </div>
                       
                       <div className="border-t pt-3">
                         <div className="flex justify-between font-bold">
-                          <span>Rate:</span>
+                          <span>Cost:</span>
                           <span className="text-lg">
-                            {item.rate ? 
-                              formatPrice(item.rate) : 
+                            {item.operation_cost ? 
+                              formatPrice(item.operation_cost) : 
                               <span className="text-red-500">Missing</span>
                             }
                           </span>
@@ -1102,128 +1048,70 @@ export default function PriceList() {
           </DialogHeader>
           
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="code">Code</Label>
-                <Input
-                  id="code"
-                  {...form.register('code')}
-                  placeholder="Item code"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="ref">Reference</Label>
-                <Input
-                  id="ref"
-                  {...form.register('ref')}
-                  placeholder="Reference number"
-                />
-              </div>
+            <div>
+              <Label htmlFor="id">ID *</Label>
+              <Input
+                id="id"
+                {...form.register('id', { required: true })}
+                placeholder="Unique identifier"
+              />
             </div>
 
             <div>
-              <Label htmlFor="description">Description *</Label>
-              <Textarea
-                id="description"
-                {...form.register('description', { required: true })}
-                placeholder="Item description"
-                rows={3}
+              <Label htmlFor="name">Name *</Label>
+              <Input
+                id="name"
+                {...form.register('name', { required: true })}
+                placeholder="Product name"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="product_template_variant_value_ids">Variant/Size</Label>
+              <Input
+                id="product_template_variant_value_ids"
+                {...form.register('product_template_variant_value_ids')}
+                placeholder="e.g., size: Wurth 155 piece set"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="category">Category *</Label>
+                <Label htmlFor="uom_id">Unit *</Label>
                 <Input
-                  id="category"
-                  {...form.register('category', { required: true })}
-                  placeholder="e.g., Concrete, Steel, Electrical"
+                  id="uom_id"
+                  {...form.register('uom_id', { required: true })}
+                  placeholder="e.g., Unit, m², kg, ton"
                 />
               </div>
               
               <div>
-                <Label htmlFor="subcategory">Subcategory *</Label>
+                <Label htmlFor="operation_cost">Cost *</Label>
                 <Input
-                  id="subcategory"
-                  {...form.register('subcategory', { required: true })}
-                  placeholder="Subcategory"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="unit">Unit *</Label>
-                <Input
-                  id="unit"
-                  {...form.register('unit', { required: true })}
-                  placeholder="e.g., pcs, m², kg, ton"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="rate">Rate *</Label>
-                <Input
-                  id="rate"
+                  id="operation_cost"
                   type="number"
                   step="0.01"
-                  {...form.register('rate', { required: true, valueAsNumber: true })}
+                  {...form.register('operation_cost', { required: true, valueAsNumber: true })}
                   placeholder="0.00"
                 />
               </div>
             </div>
 
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm">Keywords & Phrases</h4>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="keyword1">Keyword 1</Label>
-                  <Input
-                    id="keyword1"
-                    {...form.register('keyword1')}
-                    placeholder="e.g., concrete"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="keyword2">Keyword 2</Label>
-                  <Input
-                    id="keyword2"
-                    {...form.register('keyword2')}
-                    placeholder="e.g., reinforced"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="phrase1">Phrase 1</Label>
-                  <Input
-                    id="phrase1"
-                    {...form.register('phrase1')}
-                    placeholder="e.g., high strength concrete"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="phrase2">Phrase 2</Label>
-                  <Input
-                    id="phrase2"
-                    {...form.register('phrase2')}
-                    placeholder="e.g., reinforced concrete beam"
-                  />
-                </div>
-              </div>
+            <div>
+              <Label htmlFor="category">Category</Label>
+              <Input
+                id="category"
+                {...form.register('category')}
+                placeholder="e.g., Tools, Materials, Fencing"
+              />
             </div>
 
             <div>
-              <Label htmlFor="remark">Remark</Label>
+              <Label htmlFor="description">Description</Label>
               <Textarea
-                id="remark"
-                {...form.register('remark')}
-                placeholder="Additional notes or remarks"
+                id="description"
+                {...form.register('description')}
+                placeholder="Additional description (optional)"
                 rows={2}
               />
             </div>

@@ -41,18 +41,39 @@ export class MatchingService {
   }
 
   private async ensureClientsInitialized() {
-    if (this.cohereClient && this.openaiClient) return;
-    
     const settings = await this.convex.query(api.applicationSettings.getAll);
     const cohereKey = settings.find(s => s.key === 'V2_API_KEY')?.value;
     const openaiKey = settings.find(s => s.key === 'V1_API_KEY')?.value;
     
-    if (cohereKey && !this.cohereClient) {
-      this.cohereClient = new CohereClient({ token: cohereKey });
+    console.log('[MatchingService] Checking API Keys:', {
+      hasV2: !!cohereKey,
+      hasV1: !!openaiKey,
+      v2KeyLength: cohereKey?.length || 0,
+      v1KeyLength: openaiKey?.length || 0,
+      currentCohereClient: !!this.cohereClient,
+      currentOpenAIClient: !!this.openaiClient
+    });
+    
+    // Always try to initialize Cohere if we have a key
+    if (cohereKey) {
+      try {
+        this.cohereClient = new CohereClient({ token: cohereKey });
+        console.log('[MatchingService] V2 (Cohere) client initialized successfully');
+      } catch (error) {
+        console.error('[MatchingService] Failed to initialize V2 (Cohere):', error);
+        this.cohereClient = null;
+      }
     }
     
-    if (openaiKey && !this.openaiClient) {
-      this.openaiClient = new OpenAI({ apiKey: openaiKey });
+    // Always try to initialize OpenAI if we have a key
+    if (openaiKey) {
+      try {
+        this.openaiClient = new OpenAI({ apiKey: openaiKey });
+        console.log('[MatchingService] V1 (OpenAI) client initialized successfully');
+      } catch (error) {
+        console.error('[MatchingService] Failed to initialize V1 (OpenAI):', error);
+        this.openaiClient = null;
+      }
     }
   }
 
@@ -452,7 +473,10 @@ export class MatchingService {
     priceItems: PriceItem[],
     contextHeaders?: string[]
   ): Promise<MatchingResult> {
+    console.log('[cohereMatch] Starting with client:', !!this.cohereClient);
+    
     if (!this.cohereClient) {
+      console.log('[cohereMatch] No Cohere client available, falling back to LOCAL');
       return this.localMatch(description, priceItems, contextHeaders);
     }
 
@@ -486,6 +510,7 @@ export class MatchingService {
         queryEmbedding = response.embeddings[0];
         this.embeddingCache.set(queryCacheKey, queryEmbedding);
       } catch (error) {
+        console.error('[cohereMatch] Failed to generate query embedding:', error);
         return this.localMatch(description, priceItems, contextHeaders);
       }
     }
@@ -569,7 +594,10 @@ export class MatchingService {
     priceItems: PriceItem[],
     contextHeaders?: string[]
   ): Promise<MatchingResult> {
+    console.log('[openAIMatch] Starting with client:', !!this.openaiClient);
+    
     if (!this.openaiClient) {
+      console.log('[openAIMatch] No OpenAI client available, falling back to LOCAL');
       return this.localMatch(description, priceItems, contextHeaders);
     }
 
@@ -598,6 +626,7 @@ export class MatchingService {
       );
       queryEmbedding = response.data[0].embedding;
     } catch (error) {
+      console.error('[openAIMatch] Failed to generate query embedding:', error);
       return this.localMatch(description, priceItems, contextHeaders);
     }
 
