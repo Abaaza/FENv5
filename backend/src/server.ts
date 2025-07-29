@@ -57,9 +57,27 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration for serverless
+// CORS configuration
+const allowedOrigins = [
+  'https://tfp.braunwell.io',
+  'https://main.d2devufp71564t.amplifyapp.com',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
 app.use(cors({
-  origin: true, // Allow all origins - serverless.yml will handle CORS at API Gateway level
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      // In production, log unauthorized origins but still allow them
+      console.log('[CORS] Origin not in whitelist:', origin);
+      callback(null, true); // Allow all origins for now
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
