@@ -1,6 +1,22 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 
+// Helper function to check if UK is in British Summer Time (BST)
+function isDST(date: Date): boolean {
+  const year = date.getFullYear();
+  
+  // BST starts last Sunday of March
+  const marchLastSunday = new Date(year, 2, 31); // March 31
+  marchLastSunday.setDate(31 - ((marchLastSunday.getDay() + 7) % 7)); // Go back to Sunday
+  
+  // BST ends last Sunday of October
+  const octoberLastSunday = new Date(year, 9, 31); // October 31
+  octoberLastSunday.setDate(31 - ((octoberLastSunday.getDay() + 7) % 7)); // Go back to Sunday
+  
+  // Check if date is within BST period
+  return date >= marchLastSunday && date < octoberLastSunday;
+}
+
 export const getStats = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
@@ -10,10 +26,16 @@ export const getStats = query({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 
-    // Get start of today (midnight in local time)
+    // Get start of today at 00:00 UK time
     const now = Date.now();
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    
+    // Get UK time by getting UTC and adjusting for UK timezone
+    // UK is UTC+0 in winter, UTC+1 in summer (BST)
+    const ukOffset = isDST(today) ? 1 : 0; // Check if British Summer Time
+    
+    // Set to midnight UTC
+    today.setUTCHours(0 - ukOffset, 0, 0, 0);
     const todayMidnight = today.getTime();
 
     const completedToday = totalProjects.filter(
@@ -23,14 +45,16 @@ export const getStats = query({
         job.completedAt >= todayMidnight
     );
 
-    // Get total price items (all items, not just active)
+    // Get active price items only (to match price list page)
     const priceItems = await ctx.db
       .query("priceItems")
+      .filter((q) => q.neq(q.field("isActive"), false))
       .collect();
 
-    // Get total clients
+    // Get active clients only (to match clients page)
     const clients = await ctx.db
       .query("clients")
+      .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
     // Calculate matches today

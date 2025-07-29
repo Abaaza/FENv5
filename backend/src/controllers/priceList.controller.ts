@@ -36,14 +36,13 @@ export async function getPriceListStats(req: Request, res: Response): Promise<vo
       categorySubcategories[category].sort();
     });
     
-    // Count incomplete items (missing category, subcategory, rate, unit, or description)
+    // Count incomplete items (check new schema fields)
     const incompleteItems = items.filter(item => {
-      return !item.category || 
-             !item.subcategory || 
-             !item.rate || 
-             item.rate === 0 ||
-             !item.unit || 
-             !item.description;
+      // Check new schema fields
+      return !item.name || 
+             !item.operation_cost || 
+             item.operation_cost === 0 ||
+             !item.uom_id;
     });
     
     res.json({

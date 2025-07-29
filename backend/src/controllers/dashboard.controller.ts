@@ -176,26 +176,53 @@ export async function getActivitySummary(req: Request, res: Response): Promise<v
       return;
     }
 
-    // Get activity summary for different time periods
+    // Get activity summary for different time periods using UK time
     const now = Date.now();
-    const oneDayAgo = now - 24 * 60 * 60 * 1000;
-    const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
-    const oneMonthAgo = now - 30 * 24 * 60 * 60 * 1000;
+    
+    // Helper to check if UK is in BST
+    const isDST = (date: Date): boolean => {
+      const year = date.getFullYear();
+      const marchLastSunday = new Date(year, 2, 31);
+      marchLastSunday.setDate(31 - ((marchLastSunday.getDay() + 7) % 7));
+      const octoberLastSunday = new Date(year, 9, 31);
+      octoberLastSunday.setDate(31 - ((octoberLastSunday.getDay() + 7) % 7));
+      return date >= marchLastSunday && date < octoberLastSunday;
+    };
+    
+    // Calculate UK midnight for today
+    const today = new Date();
+    const ukOffset = isDST(today) ? 1 : 0;
+    today.setUTCHours(0 - ukOffset, 0, 0, 0);
+    const todayStart = today.getTime();
+    
+    // Calculate UK midnight for 7 days ago
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekUkOffset = isDST(weekAgo) ? 1 : 0;
+    weekAgo.setUTCHours(0 - weekUkOffset, 0, 0, 0);
+    const weekStart = weekAgo.getTime();
+    
+    // Calculate UK midnight for 30 days ago
+    const monthAgo = new Date();
+    monthAgo.setDate(monthAgo.getDate() - 30);
+    const monthUkOffset = isDST(monthAgo) ? 1 : 0;
+    monthAgo.setUTCHours(0 - monthUkOffset, 0, 0, 0);
+    const monthStart = monthAgo.getTime();
 
     const [todayActivity, weekActivity, monthActivity] = await Promise.all([
       convex.query(api.dashboard.getActivitySummary, {
         userId: toConvexId<'users'>(req.user.id),
-        startDate: oneDayAgo,
+        startDate: todayStart,
         endDate: now
       }),
       convex.query(api.dashboard.getActivitySummary, {
         userId: toConvexId<'users'>(req.user.id),
-        startDate: oneWeekAgo,
+        startDate: weekStart,
         endDate: now
       }),
       convex.query(api.dashboard.getActivitySummary, {
         userId: toConvexId<'users'>(req.user.id),
-        startDate: oneMonthAgo,
+        startDate: monthStart,
         endDate: now
       })
     ]);
