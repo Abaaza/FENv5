@@ -72,11 +72,11 @@ export default function PriceMatchingNew() {
     file: null,
   });
 
-  // Fetch clients
+  // Fetch active clients only
   const { data: clients = [] } = useQuery({
-    queryKey: ['clients'],
+    queryKey: ['active-clients'],
     queryFn: async () => {
-      const response = await api.get('/clients');
+      const response = await api.get('/clients/active');
       return response.data;
     },
   });
