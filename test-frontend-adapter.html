@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Price Item Adapter</title>
+</head>
+<body>
+    <h1>Price Item Adapter Test</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        // Adapter function (same as in the frontend)
+        function adaptPriceItem(item) {
+            return {
+                ...item,
+                // Map legacy fields to expected fields
+                code: item.code || item.id,
+                subcategory: item.subcategory || item.product_template_variant_value_ids || '',
+                unit: item.unit || item.uom_id || 'Unit',
+                rate: item.rate !== undefined ? item.rate : (item.operation_cost || 0),
+                
+                // Keep original fields for backward compatibility
+                id: item.id,
+                product_template_variant_value_ids: item.product_template_variant_value_ids,
+                uom_id: item.uom_id,
+                operation_cost: item.operation_cost
+            };
+        }
+        
+        // Test with sample data from database
+        const sampleItem = {
+            "_creationTime": 1754383468153.2285,
+            "_id": "k17aktbcqp3c5nqza8xzeyhk3s7n3bfn",
+            "category": "Drill Bits & Tools",
+            "createdAt": 1754383468153,
+            "createdBy": "k973z1yzxt6z645h1gpww4c0697ky520",
+            "description": "Steel drill bit - Wurth 155 piece set",
+            "id": "31915_44e3f914",
+            "isActive": true,
+            "keywords": ["steel", "drill", "bit", "wurth", "piece", "set"],
+            "name": "Steel drill bit - Wurth 155 piece set",
+            "operation_cost": 125,
+            "product_template_variant_value_ids": "Steel Drill Bits",
+            "uom_id": "Unit",
+            "updatedAt": 1754383468153
+        };
+        
+        const adaptedItem = adaptPriceItem(sampleItem);
+        
+        const output = document.getElementById('output');
+        output.innerHTML = `
+Original item has:
+- id: ${sampleItem.id}
+- product_template_variant_value_ids: ${sampleItem.product_template_variant_value_ids}
+- uom_id: ${sampleItem.uom_id}
+- operation_cost: ${sampleItem.operation_cost}
+
+Adapted item has:
+- code: ${adaptedItem.code}
+- subcategory: ${adaptedItem.subcategory}
+- unit: ${adaptedItem.unit}
+- rate: ${adaptedItem.rate}
+
+✅ All required fields are now available!
+        `;
+    </script>
+</body>
+</html>

@@ -96,7 +96,9 @@ export default defineSchema({
     matchingMethod: v.union(
       v.literal("LOCAL"),
       v.literal("COHERE"),
-      v.literal("OPENAI")
+      v.literal("OPENAI"),
+      v.literal("V1"),
+      v.literal("V2")
     ),
     totalValue: v.optional(v.number()),
     error: v.optional(v.string()),

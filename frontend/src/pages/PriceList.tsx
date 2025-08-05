@@ -31,6 +31,7 @@ import { useConvex } from 'convex/react';
 import { api as convexApi } from '../../convex/_generated/api';
 import { useForm } from 'react-hook-form';
 import { useCurrency } from '../hooks/useCurrency';
+import { adaptPriceItems } from '../utils/priceItemAdapter';
 
 interface PriceItem {
   _id: string;
@@ -110,7 +111,8 @@ export default function PriceList() {
     queryKey: ['price-items'],
     queryFn: async () => {
       const response = await api.get('/price-list');
-      return response.data;
+      // Adapt the items to ensure all expected fields are present
+      return adaptPriceItems(response.data);
     },
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),

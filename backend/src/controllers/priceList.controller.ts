@@ -67,7 +67,23 @@ export async function getAllPriceItems(req: Request, res: Response): Promise<voi
       ? await convex.query(api.priceItems.getActive)
       : await convex.query(api.priceItems.getAll);
     
-    res.json(items);
+    // Adapt items to ensure frontend gets the expected field names
+    const adaptedItems = items.map((item: any) => ({
+      ...item,
+      // Map legacy fields to expected fields
+      code: item.code || item.id,
+      subcategory: item.subcategory || item.product_template_variant_value_ids || '',
+      unit: item.unit || item.uom_id || 'Unit',
+      rate: item.rate !== undefined ? item.rate : (item.operation_cost || 0),
+      
+      // Keep original fields for backward compatibility
+      id: item.id,
+      product_template_variant_value_ids: item.product_template_variant_value_ids,
+      uom_id: item.uom_id,
+      operation_cost: item.operation_cost
+    }));
+    
+    res.json(adaptedItems);
   } catch (error) {
     console.error('Get price items error:', error);
     res.status(500).json({ error: 'Failed to get price items' });
