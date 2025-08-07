@@ -6,9 +6,8 @@ require('dotenv').config();
 
 // Configuration
 const CONVEX_URL = process.env.CONVEX_URL || 'https://bright-scorpion-424.convex.cloud';
-const BATCH_SIZE = 50; // Import in batches to avoid timeouts
+const BATCH_SIZE = 50; // Can use larger batches with the import mutation
 const DELAY_BETWEEN_BATCHES = 2000; // 2 seconds delay
-const START_FROM = 2301; // Start from item 2301
 
 // Initialize Convex client
 const client = new ConvexClient(CONVEX_URL);
@@ -17,10 +16,21 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function importCSVPriceList(userEmail = 'abaza@tfp.com') {
+function cleanRef(ref) {
+  // Clean up the __export__.product_product_ prefix
+  if (ref && ref.startsWith('__export__.product_product_')) {
+    return ref.replace('__export__.product_product_', '');
+  }
+  return ref;
+}
+
+async function importAllItems(userEmail = 'abaza@tfp.com', startFrom = 1) {
   try {
-    console.log('🚀 Starting CSV import to Convex...');
+    console.log('🚀 Starting complete import with proper formatting...');
     console.log('Convex URL:', CONVEX_URL);
+    if (startFrom > 1) {
+      console.log(`Starting from item ${startFrom}`);
+    }
     
     // Read the CSV file
     const csvPath = path.join(__dirname, 'tfp-pricelist-final.csv');
@@ -30,16 +40,14 @@ async function importCSVPriceList(userEmail = 'abaza@tfp.com') {
     }
     
     const csvContent = fs.readFileSync(csvPath, 'utf8');
-    const allRecords = csv.parse(csvContent, {
+    const records = csv.parse(csvContent, {
       columns: true,
       skip_empty_lines: true
     });
     
-    // Skip already imported items
-    const records = allRecords.slice(START_FROM - 1);
-    
-    console.log(`\n📊 Loaded ${allRecords.length} total items from CSV file`);
-    console.log(`📊 Processing items ${START_FROM} to ${allRecords.length} (${records.length} items)`);
+    // Get items to process
+    const itemsToProcess = startFrom > 1 ? records.slice(startFrom - 1) : records;
+    console.log(`\n📊 Processing ${itemsToProcess.length} items`);
     
     // Get admin user by email
     console.log(`\n🔍 Looking up user: ${userEmail}`);
@@ -47,33 +55,20 @@ async function importCSVPriceList(userEmail = 'abaza@tfp.com') {
     
     if (!user) {
       console.error(`❌ User not found with email: ${userEmail}`);
-      console.log('\nPlease make sure the user exists in the database.');
       process.exit(1);
     }
     
     const userId = user._id;
     console.log(`✅ Found user: ${user.name} (ID: ${userId})`);
     
-    // Ask for confirmation
-    console.log('\n⚠️  This will import all price items to the database.');
-    console.log('Press Ctrl+C to cancel, or wait 3 seconds to continue...\n');
-    await sleep(3000);
-    
-    // Convert CSV records to price items format and clean ref field
-    const priceItems = records.map(record => {
-      // Parse keywords from semicolon-separated string back to array
+    // Convert CSV records to price items format with cleaned ref
+    const priceItems = itemsToProcess.map(record => {
       const keywords = record.keywords ? record.keywords.split('; ').filter(k => k.trim()) : [];
       
-      // Clean the ref field from __export__ prefix
-      let cleanedRef = record.ref;
-      if (cleanedRef && cleanedRef.startsWith('__export__.product_product_')) {
-        cleanedRef = cleanedRef.replace('__export__.product_product_', '');
-      }
-      
       return {
-        id: record._id, // Use _id from CSV as the id field
+        id: record._id,
         code: record.code || undefined,
-        ref: cleanedRef || undefined,
+        ref: cleanRef(record.ref) || undefined, // Clean the ref field
         description: record.description,
         category: record.category || undefined,
         subcategory: record.subcategory || undefined,
@@ -83,59 +78,71 @@ async function importCSVPriceList(userEmail = 'abaza@tfp.com') {
       };
     });
     
-    // Process in batches
+    // Process in batches using importPriceItems mutation
     const totalBatches = Math.ceil(priceItems.length / BATCH_SIZE);
     let totalCreated = 0;
     let totalUpdated = 0;
     let totalErrors = [];
+    let successfulBatches = 0;
     
     for (let i = 0; i < totalBatches; i++) {
       const start = i * BATCH_SIZE;
       const end = Math.min(start + BATCH_SIZE, priceItems.length);
       const batch = priceItems.slice(start, end);
+      const actualItemNumbers = startFrom > 1 
+        ? `${startFrom + start}-${startFrom + end - 1}`
+        : `${start + 1}-${end}`;
       
-      console.log(`\n📦 Processing batch ${i + 1}/${totalBatches} (items ${start + 1}-${end})...`);
+      console.log(`\n📦 Processing batch ${i + 1}/${totalBatches} (items ${actualItemNumbers})...`);
       
       try {
-        // Call the existing Convex mutation for batch creation
-        // Transform items to match the expected format
-        const transformedItems = batch.map(item => ({
-          id: item.id,
-          name: item.description,
-          operation_cost: item.rate,
-          uom_id: item.unit || 'Unit',
-          product_template_variant_value_ids: item.ref || '',
-          description: item.description,
-          category: item.category,
-          keywords: item.keywords
-        }));
-        
-        const result = await client.mutation('priceItems.js:createBatch', {
-          items: transformedItems,
+        // Use the importPriceItems mutation
+        const result = await client.mutation('importPriceList:importPriceItems', {
+          items: batch,
           userId: userId,
         });
         
-        totalCreated += result.created || 0;
-        totalUpdated += result.updated || 0;
-        if (result.errors && result.errors.length > 0) {
-          totalErrors = totalErrors.concat(result.errors);
+        if (result) {
+          totalCreated += result.created || 0;
+          totalUpdated += result.updated || 0;
+          if (result.errors && result.errors.length > 0) {
+            totalErrors = totalErrors.concat(result.errors);
+          }
+          successfulBatches++;
+          console.log(`   ✅ Batch complete: ${result.created || 0} created, ${result.updated || 0} updated`);
+          
+          if (result.errors && result.errors.length > 0) {
+            console.log(`   ⚠️ ${result.errors.length} errors in this batch`);
+          }
         }
         
-        console.log(`   ✅ Batch complete: ${result.created} created, ${result.updated} updated`);
-        
-        // Add delay between batches to avoid rate limiting
+        // Add delay between batches
         if (i < totalBatches - 1) {
           console.log(`   ⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch...`);
           await sleep(DELAY_BETWEEN_BATCHES);
         }
       } catch (error) {
         console.error(`   ❌ Error processing batch ${i + 1}:`, error.message);
-        totalErrors.push(`Batch ${i + 1}: ${error.message}`);
+        totalErrors.push(`Batch ${i + 1} (items ${actualItemNumbers}): ${error.message}`);
         
         // If rate limited, wait longer
         if (error.message.includes('429') || error.message.includes('rate')) {
           console.log('   ⏳ Rate limited - waiting 10 seconds...');
           await sleep(10000);
+          // Retry the batch once
+          try {
+            const retryResult = await client.mutation('importPriceList:importPriceItems', {
+              items: batch,
+              userId: userId,
+            });
+            if (retryResult) {
+              totalCreated += retryResult.created || 0;
+              totalUpdated += retryResult.updated || 0;
+              console.log(`   ✅ Retry successful: ${retryResult.created || 0} created, ${retryResult.updated || 0} updated`);
+            }
+          } catch (retryError) {
+            console.error(`   ❌ Retry failed:`, retryError.message);
+          }
         }
       }
     }
@@ -146,8 +153,9 @@ async function importCSVPriceList(userEmail = 'abaza@tfp.com') {
     console.log('='.repeat(60));
     console.log(`✅ Created: ${totalCreated} items`);
     console.log(`🔄 Updated: ${totalUpdated} items`);
-    console.log(`❌ Errors: ${totalErrors.length}`);
-    console.log(`📦 Total processed: ${priceItems.length} items`);
+    console.log(`📦 Successful batches: ${successfulBatches}/${totalBatches}`);
+    console.log(`❌ Failed batches: ${totalBatches - successfulBatches}`);
+    console.log(`📦 Total items processed: ${priceItems.length}`);
     
     if (totalErrors.length > 0) {
       console.log('\n⚠️  Errors encountered:');
@@ -157,7 +165,24 @@ async function importCSVPriceList(userEmail = 'abaza@tfp.com') {
       }
     }
     
-    console.log('\n✨ CSV import completed successfully!');
+    console.log('\n✨ Import completed!');
+    
+    // Check final count
+    console.log('\n🔍 Checking final database count...');
+    const allItems = await client.query('priceItems:getAll');
+    console.log(`📊 Total items in database: ${allItems ? allItems.length : 0}`);
+    
+    // Show sample of imported items
+    if (allItems && allItems.length > 0) {
+      console.log('\n📦 Sample of imported items:');
+      const samples = allItems.slice(-5); // Last 5 items
+      samples.forEach((item, idx) => {
+        const ref = item.ref && !item.ref.startsWith('__export__') 
+          ? ` (${item.ref})` 
+          : '';
+        console.log(`  ${idx + 1}. ${item.description}${ref} - ${item.unit}: £${item.rate}`);
+      });
+    }
     
   } catch (error) {
     console.error('\n❌ Fatal error during import:', error);
@@ -169,16 +194,18 @@ async function importCSVPriceList(userEmail = 'abaza@tfp.com') {
 
 // Main execution
 async function main() {
-  console.log('🚀 TFP CSV Price List Import Tool\n');
+  console.log('🚀 TFP Price List Import Tool (Final Version)\n');
   
   // Check command line arguments
   const args = process.argv.slice(2);
   const userEmail = args.find(arg => arg.startsWith('--email='))?.split('=')[1] || 'abaza@tfp.com';
+  const startFrom = parseInt(args.find(arg => arg.startsWith('--start='))?.split('=')[1] || '2301');
   
   if (args.includes('--help')) {
-    console.log('Usage: node import-csv-to-convex.js [options]');
+    console.log('Usage: node import-final.js [options]');
     console.log('\nOptions:');
     console.log('  --email=<email>   Email of the admin user (default: abaza@tfp.com)');
+    console.log('  --start=<number>  Start from item number (default: 2301)');
     console.log('  --clear           Clear all existing price items before import');
     console.log('  --help            Show this help message');
     return;
@@ -206,8 +233,8 @@ async function main() {
     }
   }
   
-  // Run the import
-  await importCSVPriceList(userEmail);
+  // Import items
+  await importAllItems(userEmail, startFrom);
 }
 
 // Run if executed directly
@@ -218,4 +245,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { importCSVPriceList };
+module.exports = { importAllItems };
