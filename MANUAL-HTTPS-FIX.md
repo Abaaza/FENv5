@@ -4,7 +4,7 @@ Since SSH isn't working, here's how to fix HTTPS using EC2 Instance Connect:
 
 ## Step 1: Connect to EC2 via AWS Console
 1. Go to [AWS EC2 Console](https://console.aws.amazon.com/ec2/)
-2. Find your instance (IP: 54.90.3.22)
+2. Find your instance (IP: 44.223.70.138)
 3. Select it and click "Connect"
 4. Choose "EC2 Instance Connect"
 5. Click "Connect"
@@ -19,7 +19,7 @@ sudo mkdir -p /etc/pki/tls/private /etc/pki/tls/certs
 sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout /etc/pki/tls/private/nginx-selfsigned.key \
   -out /etc/pki/tls/certs/nginx-selfsigned.crt \
-  -subj "/C=US/ST=State/L=City/O=TFP/CN=54.90.3.22"
+  -subj "/C=US/ST=State/L=City/O=TFP/CN=44.223.70.138"
 
 # 2. Create nginx HTTPS config
 sudo tee /etc/nginx/conf.d/boq-ssl.conf > /dev/null << 'EOF'
@@ -71,9 +71,9 @@ curl -k https://localhost/api/health
 ```
 
 ## Step 3: Trust the Certificate in Your Browser
-1. Open https://54.90.3.22/api/health in your browser
+1. Open https://44.223.70.138/api/health in your browser
 2. You'll see a certificate warning
-3. Click "Advanced" → "Proceed to 54.90.3.22 (unsafe)"
+3. Click "Advanced" → "Proceed to 44.223.70.138 (unsafe)"
 4. You should see: `{"status":"ok"}`
 
 ## Step 4: Test Your Application

@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 async function createAdminUser() {
   try {
     // First, let's create the user directly via the backend API
-    const response = await axios.post('https://54.90.3.22/api/auth/register', {
+    const response = await axios.post('https://44.223.70.138/api/auth/register', {
       email: 'abaza@tfp.com',
       password: 'abaza123',
       name: 'Admin User',

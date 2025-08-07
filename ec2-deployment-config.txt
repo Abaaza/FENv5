@@ -1,8 +1,8 @@
-﻿# Auto-generated EC2 deployment configuration
+# Auto-generated EC2 deployment configuration
 # Created: 2025-07-18 13:14:46
 
 EC2_INSTANCE_ID=i-0ca4b54be0a3a543a
-EC2_PUBLIC_IP=54.90.3.22
+EC2_PUBLIC_IP=44.223.70.138
 EC2_PUBLIC_DNS=ec2-54-90-3-22.compute-1.amazonaws.com
 PEM_FILE_PATH=C:\Users\abaza\Downloads\tfp-boq-key.pem
 SECURITY_GROUP_ID=sg-07e2d78aedf389091

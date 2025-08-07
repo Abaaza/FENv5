@@ -1,7 +1,7 @@
 # Quick CloudFront Setup for HTTPS
 
 ## The Problem
-- Your backend works on HTTP (http://54.90.3.22:5000) ✓
+- Your backend works on HTTP (http://44.223.70.138:5000) ✓
 - HTTPS is not configured properly on EC2 ✗
 - Amplify frontend requires HTTPS to avoid mixed content ✗
 
@@ -11,7 +11,7 @@
 1. Go to [AWS CloudFront Console](https://console.aws.amazon.com/cloudfront/)
 2. Click "Create Distribution"
 3. Configure:
-   - **Origin Domain**: `54.90.3.22`
+   - **Origin Domain**: `44.223.70.138`
    - **Origin Path**: Leave empty
    - **Origin Port**: `5000`
    - **Protocol**: `HTTP only`
@@ -56,7 +56,7 @@ git push
 If you need it working RIGHT NOW:
 
 1. Install ngrok: https://ngrok.com/download
-2. Run: `ngrok http 54.90.3.22:5000`
+2. Run: `ngrok http 44.223.70.138:5000`
 3. Use the HTTPS URL ngrok provides
 4. Update frontend with ngrok URL
 

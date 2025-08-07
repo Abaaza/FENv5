@@ -28,7 +28,7 @@ server {
 # Direct IP HTTPS access
 server {
     listen 443 ssl;
-    server_name 54.90.3.22;
+    server_name 44.223.70.138;
     
     ssl_certificate /etc/nginx/ssl/cert.pem;
     ssl_certificate_key /etc/nginx/ssl/key.pem;
@@ -49,7 +49,7 @@ server {
 # Direct IP HTTP to HTTPS redirect
 server {
     listen 80;
-    server_name 54.90.3.22;
+    server_name 44.223.70.138;
     return 301 https://$server_name$request_uri;
 }
 
@@ -66,5 +66,5 @@ sudo nginx -t && sudo systemctl reload nginx
 
 echo "=== Fixed! ==="
 echo "- origin-tfp.braunwell.io: HTTP only for CloudFront"
-echo "- 54.90.3.22: HTTPS with redirect"
+echo "- 44.223.70.138: HTTPS with redirect"
 echo "- No catch-all redirects"

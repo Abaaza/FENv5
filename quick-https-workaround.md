@@ -12,9 +12,9 @@ Your frontend (Amplify) is served over HTTPS but your backend (EC2) is on HTTP, 
 
 ### Option 2: Manual Browser Override (Temporary)
 1. Open Chrome/Edge
-2. Navigate to: https://54.90.3.22/api/health
+2. Navigate to: https://44.223.70.138/api/health
 3. You'll see a certificate warning
-4. Click "Advanced" → "Proceed to 54.90.3.22 (unsafe)"
+4. Click "Advanced" → "Proceed to 44.223.70.138 (unsafe)"
 5. This will allow your browser to accept the self-signed certificate
 6. Now your login should work
 
@@ -34,7 +34,7 @@ sudo mkdir -p /etc/nginx/ssl
 sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/key.pem \
     -out /etc/nginx/ssl/cert.pem \
-    -subj "/C=US/ST=State/L=City/O=TFP/CN=54.90.3.22"
+    -subj "/C=US/ST=State/L=City/O=TFP/CN=44.223.70.138"
 
 # Create nginx config
 sudo tee /etc/nginx/conf.d/boq-https.conf << 'EOF'

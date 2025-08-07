@@ -1,8 +1,8 @@
 # The Fencing People - Deployment Status
 
 ## ✅ What's Working
-1. **Backend is running** on EC2 (54.90.3.22) port 5000
-2. **Health endpoint works**: http://54.90.3.22:5000/api/health
+1. **Backend is running** on EC2 (44.223.70.138) port 5000
+2. **Health endpoint works**: http://44.223.70.138:5000/api/health
 3. **Admin user exists**: abaza@tfp.com (confirmed by "User already exists" error)
 4. **Convex is deployed**: https://bright-scorpion-424.convex.cloud
 
@@ -26,7 +26,7 @@ Since you already have Lambda deployment scripts, use the original serverless de
 ### Option 3: Fix Nginx Manually
 SSH into the server and create the config manually:
 ```bash
-ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@54.90.3.22
+ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@44.223.70.138
 sudo nano /etc/nginx/conf.d/api.conf
 ```
 
@@ -73,7 +73,7 @@ The "Internal server error" during login suggests the backend can't connect to C
 1. **For immediate testing**: Use Chrome with disabled security
 2. **For production**: Either fix Nginx or use Lambda deployment
 3. **Update Amplify** once HTTPS is working:
-   - VITE_API_URL = https://54.90.3.22/api
+   - VITE_API_URL = https://44.223.70.138/api
    - Redeploy Amplify
 
 ## Test Credentials

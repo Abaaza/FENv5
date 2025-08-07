@@ -37,7 +37,7 @@ You'll need to:
 ### Step 4: Update Amplify
 In AWS Amplify Console, update environment variables:
 ```
-VITE_API_URL=https://54.90.3.22/api
+VITE_API_URL=https://44.223.70.138/api
 VITE_CONVEX_URL=https://lovely-armadillo-372.convex.cloud
 ```
 
@@ -80,5 +80,5 @@ After separation, verify:
 
 ### The Fencing People (New Project)
 - Convex: `https://lovely-armadillo-372.convex.cloud` ✅ NEW
-- Backend: `https://54.90.3.22/api`
+- Backend: `https://44.223.70.138/api`
 - Frontend: `https://main.d2devufp71564t.amplifyapp.com`

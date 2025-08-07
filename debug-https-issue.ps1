@@ -22,7 +22,7 @@ Write-Host "`n2. Testing backend endpoints..." -ForegroundColor Yellow
 # Test HTTP
 Write-Host "`nTesting HTTP endpoint:" -ForegroundColor Cyan
 try {
-    $httpResponse = Invoke-WebRequest -Uri "http://54.90.3.22:5000/api/health" -Method GET -UseBasicParsing -TimeoutSec 5
+    $httpResponse = Invoke-WebRequest -Uri "http://44.223.70.138:5000/api/health" -Method GET -UseBasicParsing -TimeoutSec 5
     Write-Host "HTTP Status: $($httpResponse.StatusCode)" -ForegroundColor Green
 } catch {
     Write-Host "HTTP Error: $_" -ForegroundColor Red
@@ -33,11 +33,11 @@ Write-Host "`nTesting HTTPS endpoint (ignoring certificate):" -ForegroundColor C
 try {
     # PowerShell Core syntax
     if ($PSVersionTable.PSVersion.Major -ge 6) {
-        $httpsResponse = Invoke-WebRequest -Uri "https://54.90.3.22/api/health" -Method GET -SkipCertificateCheck -UseBasicParsing -TimeoutSec 5
+        $httpsResponse = Invoke-WebRequest -Uri "https://44.223.70.138/api/health" -Method GET -SkipCertificateCheck -UseBasicParsing -TimeoutSec 5
     } else {
         # Windows PowerShell syntax
         [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
-        $httpsResponse = Invoke-WebRequest -Uri "https://54.90.3.22/api/health" -Method GET -UseBasicParsing -TimeoutSec 5
+        $httpsResponse = Invoke-WebRequest -Uri "https://44.223.70.138/api/health" -Method GET -UseBasicParsing -TimeoutSec 5
     }
     Write-Host "HTTPS Status: $($httpsResponse.StatusCode)" -ForegroundColor Green
     Write-Host "Response: $($httpsResponse.Content)" -ForegroundColor Gray
@@ -74,7 +74,7 @@ cd /home/ec2-user/app/backend && grep -E "PORT|CORS|FRONTEND" .env | sed 's/SECR
 $keyFile = "boq-key-202507161911.pem"
 if (Test-Path $keyFile) {
     Write-Host "Running SSH diagnostics..." -ForegroundColor Cyan
-    ssh -i $keyFile -o StrictHostKeyChecking=no ec2-user@54.90.3.22 $sshCommands
+    ssh -i $keyFile -o StrictHostKeyChecking=no ec2-user@44.223.70.138 $sshCommands
 } else {
     Write-Host "SSH key not found. Skipping EC2 diagnostics." -ForegroundColor Yellow
 }
@@ -104,7 +104,7 @@ import axios from 'axios';
 import { retryWithBackoff } from '../utils/retryWithBackoff';
 
 // HARDCODED FOR DEBUGGING
-const API_URL = 'https://54.90.3.22/api';
+const API_URL = 'https://44.223.70.138/api';
 console.log('API URL is hardcoded to:', API_URL);
 
 export const api = axios.create({

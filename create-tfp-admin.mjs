@@ -27,7 +27,7 @@ async function createAdminUser() {
     console.log("\nTrying direct HTTP request to backend...");
     
     try {
-      const response = await fetch("http://54.90.3.22:5000/api/auth/register", {
+      const response = await fetch("http://44.223.70.138:5000/api/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

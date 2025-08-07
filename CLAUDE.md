@@ -82,7 +82,7 @@ COOKIE_SECURE=true
 
 **Frontend (.env)**
 ```env
-VITE_API_URL=https://13.218.146.247/api
+VITE_API_URL=https://44.223.70.138/api
 VITE_CONVEX_URL=https://bright-scorpion-424.convex.cloud
 ```
 
@@ -156,7 +156,7 @@ git push origin main
 ### EC2 Management
 ```bash
 # SSH into EC2
-ssh -i boq-key-202507161911.pem ec2-user@13.218.146.247
+ssh -i boq-key-202507161911.pem ec2-user@44.223.70.138
 
 # Check backend status
 pm2 status
@@ -305,7 +305,7 @@ await retryWithBackoff(
 
 1. **Check Backend Health**:
 ```bash
-curl -k https://13.218.146.247/api/health
+curl -k https://44.223.70.138/api/health
 ```
 
 2. **View Logs**:
@@ -330,12 +330,12 @@ tail -f /home/ec2-user/.pm2/logs/boq-backend-error.log
 ### API Testing
 ```bash
 # Login
-curl -k -X POST https://13.218.146.247/api/auth/login \
+curl -k -X POST https://44.223.70.138/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"abaza@tfp.com","password":"abaza123"}'
 
 # Health check
-curl -k https://13.218.146.247/api/health
+curl -k https://44.223.70.138/api/health
 ```
 
 ## Deployment Checklist

@@ -35,7 +35,7 @@ node -e "const bcrypt=require('bcryptjs'); bcrypt.hash('abaza123',10).then(h=>co
 ### Option 2: Fix Backend Connection
 1. SSH into the server:
 ```bash
-ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@54.90.3.22
+ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@44.223.70.138
 ```
 
 2. Check Convex connection:
@@ -96,7 +96,7 @@ npx convex run createAdmin
 ## Testing the User
 Once created, test login:
 ```bash
-curl -X POST http://54.90.3.22:5000/api/auth/login \
+curl -X POST http://44.223.70.138:5000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"abaza@tfp.com","password":"abaza123"}'
 ```

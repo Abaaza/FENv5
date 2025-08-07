@@ -4,7 +4,7 @@
 echo "=== Setting up HTTPS on EC2 (MJDv9 method) ==="
 
 # Your current EC2 IP
-EC2_IP="54.90.3.22"
+EC2_IP="44.223.70.138"
 AMPLIFY_URL="https://main.d2devufp71564t.amplifyapp.com"
 
 # 1. Create self-signed certificate

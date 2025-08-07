@@ -1,7 +1,7 @@
 # Manual EC2 Deployment Script for The Fencing People
 # This script deploys step by step to avoid syntax issues
 
-$EC2_IP = "54.90.3.22"
+$EC2_IP = "44.223.70.138"
 $PEM_FILE = "C:\Users\abaza\Downloads\tfp-boq-key.pem"
 $AMPLIFY_URL = "https://main.d2devufp71564t.amplifyapp.com"
 

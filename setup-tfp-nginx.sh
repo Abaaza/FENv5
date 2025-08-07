@@ -31,7 +31,7 @@ EOF
 sudo tee /etc/nginx/conf.d/direct-access.conf > /dev/null << 'EOF'
 server {
     listen 443 ssl;
-    server_name 54.90.3.22;
+    server_name 44.223.70.138;
     
     ssl_certificate /etc/nginx/ssl/server.crt;
     ssl_certificate_key /etc/nginx/ssl/server.key;
@@ -52,7 +52,7 @@ server {
 # Redirect HTTP to HTTPS for direct IP access
 server {
     listen 80;
-    server_name 54.90.3.22;
+    server_name 44.223.70.138;
     return 301 https://$server_name$request_uri;
 }
 EOF

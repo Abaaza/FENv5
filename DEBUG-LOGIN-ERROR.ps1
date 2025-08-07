@@ -1,5 +1,5 @@
 # Debug Login Error
-$EC2_IP = "54.90.3.22"
+$EC2_IP = "44.223.70.138"
 $PEM_FILE = "C:\Users\abaza\Downloads\tfp-boq-key.pem"
 
 Clear-Host

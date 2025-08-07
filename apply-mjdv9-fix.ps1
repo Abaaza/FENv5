@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 # Apply the MJDv9 HTTPS solution to FENv5
 
-$EC2_IP = "54.90.3.22"
+$EC2_IP = "44.223.70.138"
 $KEY_FILE = "boq-key-202507161911.pem"
 
 Write-Host "=== Applying MJDv9 HTTPS Solution ===" -ForegroundColor Green

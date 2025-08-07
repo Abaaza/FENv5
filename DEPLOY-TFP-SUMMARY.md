@@ -1,15 +1,15 @@
 # The Fencing People Backend Deployment Summary
 
 ## Current Status
-✅ Backend is running on EC2 (54.90.3.22) on port 5000
+✅ Backend is running on EC2 (44.223.70.138) on port 5000
 ✅ PM2 process manager is running (process name: tfp-backend)
 ✅ Database connected to Convex: https://bright-scorpion-424.convex.cloud
 ✅ JWT authentication configured with proper secrets
 ⚠️ HTTPS/Nginx configuration needs manual fix
 
 ## Access URLs
-- **HTTP (working)**: http://54.90.3.22:5000/api/health
-- **HTTPS (pending)**: https://54.90.3.22/api/health
+- **HTTP (working)**: http://44.223.70.138:5000/api/health
+- **HTTPS (pending)**: https://44.223.70.138/api/health
 
 ## Backend Configuration
 The backend is configured with:
@@ -23,7 +23,7 @@ The backend is configured with:
 ### 1. Fix Nginx Configuration
 SSH into the server:
 ```bash
-ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@54.90.3.22
+ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@44.223.70.138
 ```
 
 Create Nginx config:
@@ -85,7 +85,7 @@ sudo systemctl restart nginx
 
 ### 2. Update Amplify Frontend
 Configure environment variables in AWS Amplify:
-- `VITE_API_URL`: `https://54.90.3.22/api`
+- `VITE_API_URL`: `https://44.223.70.138/api`
 - `VITE_CONVEX_URL`: `https://bright-scorpion-424.convex.cloud`
 
 ### 3. Create Admin User
@@ -94,13 +94,13 @@ After Nginx is working, create the admin user using the Convex dashboard or API.
 ## Monitoring Commands
 ```bash
 # Check backend logs
-ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@54.90.3.22 'pm2 logs tfp-backend'
+ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@44.223.70.138 'pm2 logs tfp-backend'
 
 # Check backend status
-ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@54.90.3.22 'pm2 status'
+ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@44.223.70.138 'pm2 status'
 
 # Restart backend if needed
-ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@54.90.3.22 'pm2 restart tfp-backend'
+ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@44.223.70.138 'pm2 restart tfp-backend'
 ```
 
 ## Key Files on EC2

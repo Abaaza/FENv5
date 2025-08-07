@@ -1,6 +1,6 @@
 #!/bin/bash
 
-EC2_IP="54.90.3.22"
+EC2_IP="44.223.70.138"
 KEY_FILE="./tfp-boq-key.pem"
 
 echo "🚀 Deploying to EC2 at $EC2_IP"

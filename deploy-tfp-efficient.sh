@@ -1,6 +1,6 @@
 #!/bin/bash
 
-EC2_IP="54.90.3.22"
+EC2_IP="44.223.70.138"
 KEY_FILE="./tfp-boq-key.pem"
 
 echo "🚀 Deploying FENv5 to TFP EC2 instance at $EC2_IP"

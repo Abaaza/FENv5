@@ -50,7 +50,7 @@ The following files need to have the correct Convex URL:
 
 ### 6. Restart Backend on EC2
 ```bash
-ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@54.90.3.22
+ssh -i "C:\Users\abaza\Downloads\tfp-boq-key.pem" ec2-user@44.223.70.138
 pm2 restart tfp-backend
 ```
 
@@ -74,7 +74,7 @@ After deployment, create the admin user:
 ## Important URLs
 - **New Convex URL**: https://lovely-armadillo-372.convex.cloud
 - **Old URL to remove**: https://bright-scorpion-424.convex.cloud
-- **EC2 Backend**: http://54.90.3.22:5000
+- **EC2 Backend**: http://44.223.70.138:5000
 - **Amplify Frontend**: https://main.d2devufp71564t.amplifyapp.com
 
 ## Troubleshooting
